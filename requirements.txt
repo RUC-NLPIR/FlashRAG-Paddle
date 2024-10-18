@@ -15,3 +15,5 @@ transformers>=4.40.0
 bm25s[full]
 fschat
 streamlit
+paddlepaddle
+paddlenlp
