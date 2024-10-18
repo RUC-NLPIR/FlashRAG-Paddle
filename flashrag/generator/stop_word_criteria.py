@@ -4,9 +4,9 @@ This software is released under the Apache License 2.0.
 """
 
 from typing import List
-import torch
-from transformers import StoppingCriteria, AutoTokenizer
-
+import paddle
+from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.generation import StoppingCriteria
 
 class StopWordCriteria(StoppingCriteria):
     """
@@ -28,14 +28,15 @@ class StopWordCriteria(StoppingCriteria):
         """
         super().__init__()
         self.tokenizer = tokenizer
-        self.input_sizes = [self.tokenizer.encode(prompt, return_tensors="pt").size(-1) for prompt in prompts]
+        self.input_sizes = [self.tokenizer.encode(prompt, return_tensors="pd")['input_ids'].shape[-1] for prompt in prompts]
         self.stop_words = stop_words
         self.max_stop_word_size = max(
-            (self.tokenizer.encode(word, return_tensors="pt").size(-1) for word in stop_words), default=0
+            (self.tokenizer.encode(word, return_tensors="pd")['input_ids'].shape[-1] for word in stop_words), default=0
         )
+        self.max_length = self.max_stop_word_size
         self.check_every = check_every
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor, **kwargs) -> bool:
         """
         Determines whether to stop generation based on the presence of stop words.
 
@@ -69,7 +70,7 @@ class StopWordCriteria(StoppingCriteria):
 
         return True  # Stop generation if all conditions are met
 
-    def extract_answers(self, input_ids: torch.LongTensor, strip_stopword: bool = True) -> List[str]:
+    def extract_answers(self, input_ids: paddle.Tensor, strip_stopword: bool = True) -> List[str]:
         """
         Extracts generated answers by removing prompts and optionally stopping at the first stop word.
 
