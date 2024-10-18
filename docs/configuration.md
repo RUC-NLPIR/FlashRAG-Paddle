@@ -142,7 +142,7 @@ rerank_batch_size: 256 # batch size for reranker
 rerank_use_fp16: True
 
 # -------------------------------------------------Generator Settings------------------------------------------------#
-framework: fschat # inference frame work of LLM, supporting: 'hf','vllm','fschat', 'openai'
+framework: hf # inference frame work of LLM, supporting: 'hf', 'openai'
 generator_model: "llama3-8B-instruct" # name or path of the generator model
 # setting for openai model, only valid in openai framework
 openai_setting:
@@ -278,7 +278,7 @@ If set `use_sentence_transformer` to `True`, there is no need to set consider po
 This section records various settings for the generator.
 
 ```yaml
-framework: fschat # inference frame work of LLM, supporting: 'hf','vllm','fschat', 'openai'
+framework: hf # inference frame work of LLM, supporting: 'hf', 'openai'
 generator_model: "llama3-8B-instruct" # name or path of the generator model
 # setting for openai model, only valid in openai framework
 openai_setting:
