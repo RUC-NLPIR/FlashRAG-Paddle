@@ -2,8 +2,8 @@ import os
 import json
 from tqdm import tqdm
 import numpy as np
-import torch
-import torch.nn.functional as F
+import paddle
+import paddle.nn.functional as F
 from flashrag.refiner import BaseRefiner
 from flashrag.prompt import PromptTemplate
 from flashrag.retriever.encoder import Encoder, STEncoder
@@ -118,11 +118,11 @@ class KGTraceRefiner(BaseRefiner):
 
         triple_examplars_text_list = [f"title: {item['title']} text: {item['text']}" for item in self.triple_examplars]
         self.triple_examplars_embeddings = self.encoder.encode(triple_examplars_text_list, is_query=False)
-        self.triple_examplars_embeddings = torch.tensor(self.triple_examplars_embeddings)
+        self.triple_examplars_embeddings = paddle.to_tensor(self.triple_examplars_embeddings)
 
         chain_examplars_text_list = [item["question"] for item in self.final_chain_examplars]
         self.chain_examplars_embeddings = self.encoder.encode(chain_examplars_text_list, is_query=True)
-        self.chain_examplars_embeddings = torch.tensor(self.chain_examplars_embeddings)
+        self.chain_examplars_embeddings = paddle.to_tensor(self.chain_examplars_embeddings)
 
         if self.triple_load_path is not None:
             with open(self.triple_load_path, "r") as f:
@@ -147,10 +147,10 @@ class KGTraceRefiner(BaseRefiner):
             batch_embedding = self.encoder.encode(batch_data, is_query=True)
             doc_embeddings.append(batch_embedding)
         doc_embeddings = np.concatenate(doc_embeddings, axis=0)
-        doc_embeddings = torch.tensor(doc_embeddings)
+        doc_embeddings = paddle.to_tensor(doc_embeddings)
 
-        similarities = torch.matmul(doc_embeddings, self.triple_examplars_embeddings.T)
-        examplars_rank = torch.argsort(similarities, dim=1, descending=True)
+        similarities = paddle.matmul(doc_embeddings, self.triple_examplars_embeddings.T)
+        examplars_rank = paddle.argsort(similarities, axis=1, descending=True)
         for i, _ in enumerate(doc_list):
             rank = examplars_rank[i].tolist()
             examplars = [self.triple_examplars[idx] for idx in rank[: self.num_examplars]]
@@ -168,10 +168,10 @@ class KGTraceRefiner(BaseRefiner):
         generating_chain_examplars = []
         final_chain_examplars = []
         query_embeddings = self.encoder.encode(all_query, is_query=True)
-        query_embeddings = torch.tensor(query_embeddings)
+        query_embeddings = paddle.to_tensor(query_embeddings)
 
-        similarities = torch.matmul(query_embeddings, self.chain_examplars_embeddings.T)
-        examplars_rank = torch.argsort(similarities, dim=1, descending=True)
+        similarities = paddle.matmul(query_embeddings, self.chain_examplars_embeddings.T)
+        examplars_rank = paddle.argsort(similarities, axis=1, descending=True)
         for i, _ in enumerate(all_query):
             rank = examplars_rank[i].tolist()
             examplars = [self.final_chain_examplars[idx] for idx in rank[: self.num_examplars]]
@@ -367,7 +367,7 @@ class KGTraceRefiner(BaseRefiner):
                     choice
                 )
 
-        answer_token_indices = torch.zeros((token_ids.shape[0],), dtype=token_ids.dtype).fill_(token_ids.shape[1] - 1)
+        answer_token_indices = paddle.zeros((token_ids.shape[0],), dtype=token_ids.dtype).fill_(token_ids.shape[1] - 1)
         for i in range(token_ids.shape[0]):
             for j in range(token_ids.shape[1]):
                 if token_ids[i, j].item() in self.token_id_to_choice_map:
@@ -401,7 +401,7 @@ class KGTraceRefiner(BaseRefiner):
                 "<{}; {}; {}>".format(triple_item["head"], triple_item["relation"], triple_item["tail"])
                 for triple_item in flatten_triples
             ]
-            triple_embeddings = torch.tensor(self.encoder.encode(triple_text, is_query=False))
+            triple_embeddings = paddle.to_tensor(self.encoder.encode(triple_text, is_query=False))
 
             paths = [[]]  # each list contains index of triples to format a reasoning path
             paths_scores = [1.0]
@@ -416,16 +416,16 @@ class KGTraceRefiner(BaseRefiner):
                     "knowledge triples: {}\nquestion: {}".format(" ".join([triple_text[idx] for idx in path]), query)
                     for path in paths
                 ]
-                path_query_embeddings = torch.tensor(self.encoder.encode(path_queries, is_query=True))
+                path_query_embeddings = paddle.to_tensor(self.encoder.encode(path_queries, is_query=True))
 
-                path_triples_similarities = torch.matmul(path_query_embeddings, triple_embeddings.T)
-                candidate_triples_mask = torch.ones_like(path_triples_similarities)
+                path_triples_similarities = paddle.matmul(path_query_embeddings, triple_embeddings.T)
+                candidate_triples_mask = paddle.ones_like(path_triples_similarities)
                 for k, path in enumerate(paths):
                     # mask the chosen triples
                     candidate_triples_mask[k, path] = 0.0
                 path_triples_similarities = path_triples_similarities - 10000 * (1.0 - candidate_triples_mask)
-                topk_most_relevant_triples_indices = torch.topk(
-                    path_triples_similarities, k=min(self.topk_triple_select, num_total_triples), dim=1
+                topk_most_relevant_triples_indices = paddle.topk(
+                    path_triples_similarities, k=min(self.topk_triple_select, num_total_triples), axis=1
                 )[1].tolist()
 
                 # construct prompts for selecting triple in reasoning chain
@@ -451,7 +451,7 @@ class KGTraceRefiner(BaseRefiner):
                     input_prompts.append(prompt)
 
                 # get generated result
-                torch.cuda.empty_cache()
+                paddle.device.cuda.empty_cache()
                 generate_output = self.generator.generate(input_prompts, max_tokens=32, return_dict=True)
                 generated_token_ids, generated_token_logits = (
                     generate_output["generated_token_ids"],
@@ -473,8 +473,8 @@ class KGTraceRefiner(BaseRefiner):
                 answer_token_probs = F.softmax(answer_token_logits[:, choices_token_ids_list], dim=1)
 
                 new_paths, new_paths_scores, new_paths_finished = [], [], []
-                topk_choices_probs, topk_choices_indices = torch.topk(
-                    answer_token_probs, k=self.num_beams, dim=1
+                topk_choices_probs, topk_choices_indices = paddle.topk(
+                    answer_token_probs, k=self.num_beams, axis=1
                 )  # for each path, select choice token in topk probs
                 for i in range(len(paths)):
                     if paths_finished[i]:
@@ -482,7 +482,7 @@ class KGTraceRefiner(BaseRefiner):
                         new_paths_scores.append(paths_scores[i])
                         new_paths_finished.append(True)
                         continue
-                    if torch.all(torch.isnan(topk_choices_probs[i])):
+                    if paddle.all(paddle.isnan(topk_choices_probs[i])):
                         print(
                             "No choice in generated results! generated text: {}".format(
                                 self.generator.tokenizer.decode(generated_token_ids[i])
@@ -494,7 +494,7 @@ class KGTraceRefiner(BaseRefiner):
                         continue
                     for b in range(self.num_beams):
                         if (
-                            torch.isnan(topk_choices_probs[i, b])
+                            paddle.isnan(topk_choices_probs[i, b])
                             or topk_choices_probs[i, b].item() < self.min_triple_prob
                         ):
                             continue
