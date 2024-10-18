@@ -2,10 +2,10 @@
 # This software is released under Creative Commons public licenses.
 
 import types
-import torch
-import transformers
-import torch.nn.functional as F
-from torch import nn
+import paddle
+import paddlenlp.transformers as transformers
+import paddle.nn.functional as F
+from paddle import nn
 
 
 class FiDT5(transformers.T5ForConditionalGeneration):
@@ -15,9 +15,9 @@ class FiDT5(transformers.T5ForConditionalGeneration):
 
     def forward_(self, **kwargs):
         if "input_ids" in kwargs:
-            kwargs["input_ids"] = kwargs["input_ids"].view(kwargs["input_ids"].size(0), -1)
+            kwargs["input_ids"] = kwargs["input_ids"].view(kwargs["input_ids"].shape[0], -1)
         if "attention_mask" in kwargs:
-            kwargs["attention_mask"] = kwargs["attention_mask"].view(kwargs["attention_mask"].size(0), -1)
+            kwargs["attention_mask"] = kwargs["attention_mask"].view(kwargs["attention_mask"].shape[0], -1)
 
         return super(FiDT5, self).forward(**kwargs)
 
@@ -29,18 +29,18 @@ class FiDT5(transformers.T5ForConditionalGeneration):
         if input_ids != None:
             # inputs might have already be resized in the generate method
             if input_ids.dim() == 3:
-                self.encoder.n_passages = input_ids.size(1)
-            input_ids = input_ids.view(input_ids.size(0), -1)
+                self.encoder.n_passages = input_ids.shape[1]
+            input_ids = input_ids.view(input_ids.shape[0], -1)
         if attention_mask != None:
-            attention_mask = attention_mask.view(attention_mask.size(0), -1)
+            attention_mask = attention_mask.view(attention_mask.shape[0], -1)
         return super().forward(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
 
     # We need to resize the inputs here, as the generate method expect 2D tensors
     def generate(self, input_ids, attention_mask, max_length):
-        self.encoder.n_passages = input_ids.size(1)
+        self.encoder.n_passages = input_ids.shape[1]
         return super().generate(
-            input_ids=input_ids.view(input_ids.size(0), -1),
-            attention_mask=attention_mask.view(attention_mask.size(0), -1),
+            input_ids=input_ids.view(input_ids.shape[0], -1),
+            attention_mask=attention_mask.view(attention_mask.shape[0], -1),
             max_length=max_length,
         )
 
@@ -58,7 +58,7 @@ class FiDT5(transformers.T5ForConditionalGeneration):
         block = []
         for mod in self.encoder.block:
             block.append(mod.module)
-        block = nn.ModuleList(block)
+        block = nn.LayerList(sublayers=block)
         self.encoder.block = block
 
     def load_t5(self, state_dict):
@@ -94,16 +94,16 @@ class FiDT5(transformers.T5ForConditionalGeneration):
         https://arxiv.org/abs/2012.04584.
         """
         scores = []
-        n_passages = context_mask.size(1)
+        n_passages = context_mask.shape[1]
         for mod in self.decoder.block:
             scores.append(mod.layer[1].EncDecAttention.score_storage)
-        scores = torch.cat(scores, dim=2)
-        bsz, n_heads, n_layers, _ = scores.size()
+        scores = paddle.concat(scores, axis=2)
+        bsz, n_heads, n_layers, _ = scores.shape
         # batch_size, n_head, n_layers, n_passages, text_maxlength
         scores = scores.view(bsz, n_heads, n_layers, n_passages, -1)
         scores = scores.masked_fill(~context_mask[:, None, None], 0.0)
-        scores = scores.sum(dim=[1, 2, 4])
-        ntokens = context_mask.sum(dim=[2]) * n_layers * n_heads
+        scores = scores.sum(axis=[1, 2, 4])
+        ntokens = context_mask.sum(axis=[2]) * n_layers * n_heads
         scores = scores / ntokens
         return scores
 
@@ -117,7 +117,7 @@ class FiDT5(transformers.T5ForConditionalGeneration):
             attn.forward = types.MethodType(cross_attention_forward, attn)
 
 
-class EncoderWrapper(torch.nn.Module):
+class EncoderWrapper(paddle.nn.Layer):
     """
     Encoder Wrapper for T5 Wrapper to obtain a Fusion-in-Decoder model.
     """
@@ -144,7 +144,7 @@ class EncoderWrapper(torch.nn.Module):
         return outputs
 
 
-class CheckpointWrapper(torch.nn.Module):
+class CheckpointWrapper(paddle.nn.Layer):
     """
     Wrapper replacing None outputs by empty tensors, which allows the use of
     checkpointing.
@@ -161,12 +161,12 @@ class CheckpointWrapper(torch.nn.Module):
 
             def custom_forward(*inputs):
                 output = self.module(*inputs, **kwargs)
-                empty = torch.tensor([], dtype=torch.float, device=output[0].device, requires_grad=True)
+                empty = paddle.to_tensor([], dtype='float32', place=output[0].place, stop_gradient=False)
                 output = tuple(x if x is not None else empty for x in output)
                 return output
 
-            output = torch.utils.checkpoint.checkpoint(custom_forward, hidden_states, attention_mask, position_bias)
-            output = tuple(x if x.size() != 0 else None for x in output)
+            output = paddle.distributed.fleet.utils.recompute(custom_forward,hidden_states, attention_mask, position_bias)
+            output = tuple(x if x.shape != 0 else None for x in output)
         else:
             output = self.module(hidden_states, attention_mask, position_bias, **kwargs)
         return output
@@ -180,9 +180,13 @@ def apply_checkpoint_wrapper(t5stack, use_checkpoint):
     for mod in t5stack.block:
         wrapped_mod = CheckpointWrapper(mod, use_checkpoint)
         block.append(wrapped_mod)
-    block = nn.ModuleList(block)
+    block = nn.LayerList(sublayers=block)
     t5stack.block = block
 
+def transpose_aux_func(dims,dim0, dim1):
+    perm = list(range(dims))
+    perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
+    return perm
 
 def cross_attention_forward(
     self,
@@ -203,18 +207,21 @@ def cross_attention_forward(
     assert head_mask == None
     assert position_bias != None or self.has_relative_attention_bias
 
-    bsz, qlen, dim = input.size()
+    bsz, qlen, dim = input.shape
     n_heads, d_heads = self.n_heads, self.d_kv
-    klen = kv.size(1)
+    klen = kv.shape[1]
 
-    q = self.q(input).view(bsz, -1, n_heads, d_heads).transpose(1, 2)
+    q = self.q(input).view(bsz, -1, n_heads, d_heads)
+    q = paddle.transpose(q,transpose_aux_func(q.ndim,1,2))
     if past_key_value_state == None:
-        k = self.k(kv).view(bsz, -1, n_heads, d_heads).transpose(1, 2)
-        v = self.v(kv).view(bsz, -1, n_heads, d_heads).transpose(1, 2)
+        k = self.k(kv).view(bsz, -1, n_heads, d_heads)
+        k = paddle.transpose(k,transpose_aux_func(k.ndim,1,2))
+        v = self.v(kv).view(bsz, -1, n_heads, d_heads)
+        v = paddle.transpose(v,transpose_aux_func(v.ndim,1,2))
     else:
         k, v = past_key_value_state
 
-    scores = torch.einsum("bnqd,bnkd->bnqk", q, k)
+    scores = paddle.einsum("bnqd,bnkd->bnqk", q, k)
 
     if mask is not None:
         scores += mask
@@ -226,11 +233,12 @@ def cross_attention_forward(
     if self.score_storage is None:
         self.score_storage = scores
 
-    attn = F.softmax(scores.float(), dim=-1).type_as(scores)
+    attn = F.softmax(x=scores.astype(dtype='float32'),axis=-1).astype(dtype=scores.dtype)
     attn = F.dropout(attn, p=self.dropout, training=self.training)
 
-    output = torch.matmul(attn, v)
-    output = output.transpose(1, 2).contiguous().view(bsz, -1, self.inner_dim)
+    output = paddle.matmul(attn, v)
+    output = output.transpose(perm=transpose_aux_func(output.ndim, 1, 2))\
+                            .contiguous().view(bsz, -1, self.inner_dim)
     output = self.o(output)
 
     if use_cache:
