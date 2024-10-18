@@ -61,12 +61,6 @@ input_list = ['who is taylor swift?', 'who is jack ma?']
 result = generator.generate(input_list)
 ```
 
-You can obtain the generation probability of each token by using `return_scores`.
-
-```python
-result, scores = generator.generate(input_list, return_scores=True)
-```
-
 The `generate` function can also accept parameters needed for generation, such as `topk`, `do_sample`, etc. These parameters can also be specified in the config, but the ones specified in `generate` take precedence.
 
 ```python
