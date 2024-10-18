@@ -1,6 +1,6 @@
 import os
 import importlib
-from transformers import AutoConfig
+from paddlenlp.transformers import AutoConfig
 from flashrag.dataset.dataset import Dataset
 
 
@@ -101,9 +101,7 @@ def get_refiner(config, retriever=None, generator=None):
     try:
         model_config = AutoConfig.from_pretrained(refiner_path)
         arch = model_config.architectures[0].lower()
-        print(arch)
-    except Exception as e:
-        print("Warning", e)
+    except:
         model_config, arch = "", ""
 
     if "recomp" in refiner_name or "bert" in arch:
