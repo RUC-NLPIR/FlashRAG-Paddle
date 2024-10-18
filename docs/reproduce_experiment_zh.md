@@ -31,9 +31,6 @@
 - [Selective-Context](#selective-context)
 - [Ret-Robust](#ret-robust)
 - [SKR](#skr)
-- [Self-RAG](#self-rag)
-- [Spring](#spring)
-
 #### AAR
 
 这种方法需要使用一个新的检索器，因此你需要下载检索器并构建索引。
@@ -81,28 +78,6 @@
 - 额外步骤2：下载训练数据（从[这里](../examples/methods/sample_data/skr_training.json)）
 - 额外步骤3：在 `skr` 函数的 `model_path` 中填写嵌入模型路径
 - 额外步骤4：在 `skr` 函数的 `training_data_path` 中填写训练数据路径
-
-#### Self-RAG
-
-这种方法需要使用一个训练好的模型，目前只支持在 `vllm` 框架中运行。
-
-- 额外步骤1：下载 Self-RAG 模型（从 [7B 模型](https://huggingface.co/selfrag/selfrag_llama2_7b)，[13B 模型](https://huggingface.co/selfrag/selfrag_llama2_13b)）
-- 额外步骤2：在 `selfrag` 函数中修改 `generator_model_path`
-
-#### Spring
-这种方法需要一个虚拟 Token 嵌入文件，目前只支持在 `hf` 框架中运行。
-
-- 额外步骤1：从[官方仓库](https://huggingface.co/yutaozhu94/SPRING)下载 embedding 文件
-- 额外步骤2：在 `spring` 函数中修改 `token_embedding_path`
-
-#### Adaptive-RAG
-
-该方法需要一个分类器对查询进行分类。由于作者没有提供官方的检查点，我们使用了其他人在Huggingface上训练的检查点进行实验（这可能会导致结果不一致）。
-
-后续如果官方开源了checkpoint，我们将更新实验结果。
-
-- 额外步骤1：从 Huggingface 仓库下载分类器模型（**非官方**）：[illuminoplanet/combined_flan_t5_xl_classifier](https://huggingface.co/illuminoplanet/combined_flan_t5_xl_classifier)
-- 额外步骤2：修改 `adaptive` 函数中的 `model_path`。
 
 
 ### 3. 运行方法
