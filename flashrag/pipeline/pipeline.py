@@ -3,7 +3,6 @@ from flashrag.dataset.utils import split_dataset, merge_dataset
 from flashrag.utils import get_retriever, get_generator, get_refiner, get_judger
 from flashrag.prompt import PromptTemplate
 
-
 class BasicPipeline:
     """Base object of all pipelines. A pipeline includes the overall process of RAG.
     If you want to implement a pipeline, you should inherit this class.
@@ -87,7 +86,6 @@ class SequentialPipeline(BasicPipeline):
 
         retrieval_results = self.retriever.batch_search(input_query)
         dataset.update_output("retrieval_result", retrieval_results)
-
         if self.refiner:
             input_prompt_flag = self.refiner.input_prompt_flag
             if "llmlingua" in self.refiner.name and input_prompt_flag:
@@ -113,7 +111,6 @@ class SequentialPipeline(BasicPipeline):
                 for q, r in zip(dataset.question, dataset.retrieval_result)
             ]
         dataset.update_output("prompt", input_prompts)
-
         if self.use_fid:
             print("Use FiD generation")
             input_prompts = []
@@ -126,7 +123,7 @@ class SequentialPipeline(BasicPipeline):
             del self.refiner
         pred_answer_list = self.generator.generate(input_prompts)
         dataset.update_output("pred", pred_answer_list)
-
+        
         dataset = self.evaluate(dataset, do_eval=do_eval, pred_process_fun=pred_process_fun)
 
         return dataset
@@ -161,15 +158,14 @@ class ConditionalPipeline(BasicPipeline):
         dataset.update_output("judge_result", judge_result)
 
         # split dataset based on judge_result
-        dataset_split = split_dataset(dataset, judge_result)
-        pos_dataset, neg_dataset = dataset_split[True], dataset_split[False]
+        pos_dataset, neg_dataset = split_dataset(dataset, judge_result)
 
         pos_dataset = self.sequential_pipeline.run(pos_dataset, do_eval=False)
         self.sequential_pipeline.prompt_template = self.zero_shot_templete
         neg_dataset = self.sequential_pipeline.naive_run(neg_dataset, do_eval=False)
 
         # merge datasets into original format
-        dataset = merge_dataset(dataset_split, judge_result)
+        dataset = merge_dataset(pos_dataset, neg_dataset, judge_result)
 
         dataset = self.evaluate(dataset, do_eval=do_eval, pred_process_fun=pred_process_fun)
 
