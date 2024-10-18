@@ -9,6 +9,8 @@
 <a href="https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets/" target="_blank"><img src=https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace%20Datasets-27b3b4.svg></a>
 <a href="https://github.com/RUC-NLPIR/FlashRAG/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/LICENSE-MIT-green"></a>
 <a><img alt="Static Badge" src="https://img.shields.io/badge/made_with-Python-blue"></a>
+<a><img alt="Paddle" src="https://img.shields.io/badge/Paddle-Supported-red"></a>
+<a><img alt="Chinese Hardwares" src="https://img.shields.io/badge/Chinese_Hardwares-Compatible-brightgreen"></a>
 </div>
 
 <h4 align="center">
@@ -24,13 +26,16 @@
 </p>
 
 </h4>
-FlashRAG is a Python toolkit for the reproduction and development of Retrieval Augmented Generation (RAG) research. Our toolkit includes 32 pre-processed benchmark RAG datasets and 15 state-of-the-art RAG algorithms. 
+FlashRAG-Paddle is a Python toolkit for Retrieval Augmented Generation (RAG) research, built on the **PaddlePaddle framework and PaddleNLP**, which is optimized for Chinese-developed chips and computing platforms.
+
+Currently, FlashRAG-Paddle includes 32 pre-processed benchmark RAG datasets and 9 state-of-the-art RAG algorithms, all fully supported in the MindSpore ecosystem. We will gradually support other algorithms in the FlashRAG repository in the future.
 
 <p align="center">
 <img src="asset/framework.jpg">
 </p>
 
-With FlashRAG and provided resources, you can effortlessly reproduce existing SOTA works in the RAG domain or implement your custom RAG processes and components.
+With FlashRAG-Paddle and our provided resources, you can effortlessly reproduce existing SOTA works in the RAG domain or implement your custom RAG processes and components. This toolkit is designed to leverage the performance advantages of Chinese-developed hardware while remaining accessible to the global research community.
+
 <p>
 <a href="https://trendshift.io/repositories/10454" target="_blank"><img src="https://trendshift.io/api/badge/repositories/10454" alt="RUC-NLPIR%2FFlashRAG | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
@@ -47,52 +52,6 @@ With FlashRAG and provided resources, you can effortlessly reproduce existing SO
 - **Efficient Preprocessing Stage**: Simplifies the RAG workflow preparation by providing various scripts like corpus processing for retrieval, retrieval index building, and pre-retrieval of documents.
 
 - **Optimized Execution**: The library's efficiency is enhanced with tools like vLLM, FastChat for LLM inference acceleration, and Faiss for vector index management.
-
-## :mag_right: Roadmap
-
-FlashRAG is still under development and there are many issues and room for improvement. We will continue to update. And we also sincerely welcome contributions on this open-source toolkit.
-
-- [x] Support OpenAI models
-- [ ] Support Claude and Gemini models
-- [x] Provdide instructions for each component
-- [x] Integrate sentence Transformers
-- [ ] Inlcude more RAG approaches
-- [ ] Add more evaluation metrics (e.g., Unieval, name-entity F1) and benchmarks (e.g., RGB benchmark)
-- [ ] Enhance code adaptability and readability
-
-
-## :page_with_curl: Changelog
-[24/10/13] A new in-domain dataset and corpus - [DomainRAG](https://arxiv.org/pdf/2406.05654) have been added to the dataset. The dataset is based on the internal enrollment data of Renmin University of China, covering seven types of tasks, which can be used for conducting domain-specific RAG testing.
-
-[24/09/24] We have released a version based on the MindSpore framework that supports Chinese hardware platforms. Please refer to [FlashRAG MindSpore](https://github.com/RUC-NLPIR/FlashRAG-MindSpore) for details.
-
-[24/09/18] Due to the complexity and limitations of installing Pyserini in certain environments, we have introduced a lightweight `BM25s` package as an alternative (faster and easier to use). The retriever based on Pyserini will be deprecated in future versions. To use retriever with `bm25s`, just set `bm25_backend` to `bm25s` in config.
-
-[24/09/09] We add support for a new method [<u>Adaptive-RAG</u>](https://aclanthology.org/2024.naacl-long.389.pdf), which can automatically select the RAG process to execute based on the type of query. See it result in [<u>result table</u>](#robot-supporting-methods).
-
-[24/08/02] We add support for a new method [<u>Spring</u>](https://arxiv.org/abs/2405.19670), significantly improve the performance of LLM by adding only a few token embeddings. See it result in [<u>result table</u>](#robot-supporting-methods).
-
-[24/07/17] Due to some unknown issues with HuggingFace, our original dataset link has been invalid. We have updated it. Please check the [new link](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets/) if you encounter any problems.
-
-[24/07/06] We add support for a new method: [<u>Trace</u>](https://arxiv.org/abs/2406.11460), which refine text by constructing a knowledge graph. See it [<u>results</u>](#robot-supporting-methods) and [<u>details</u>](./docs/baseline_details.md).
-
-<details>
-<summary>Show more</summary>
-
-[24/06/19] We add support for a new method: [<u>IRCoT</u>](https://arxiv.org/abs/2212.10509), and update the [<u>result table</u>](#robot-supporting-methods).
-
-[24/06/15] We provide a [<u>demo</u>](./examples/quick_start/demo_en.py) to perform the RAG process using our toolkit.
-
-[24/06/11] We have integrated `sentence transformers` in the retriever module. Now it's easier to use the retriever without setting pooling methods.
-
-[24/06/05] We have provided detailed document for reproducing existing methods (see [how to reproduce](./docs/reproduce_experiment.md), [baseline details](./docs/baseline_details.md)), and [<u>configurations settings</u>](./docs/configuration.md).
-
-[24/06/02] We have provided an introduction of FlashRAG for beginners, see [<u>an introduction to flashrag</u>](./docs/introduction_for_beginners_en.md) ([<u>中文版</u>](./docs/introduction_for_beginners_zh.md) [<u>한국어</u>](./docs/introduction_for_beginners_kr.md)).
-
-[24/05/31] We supported Openai-series models as generator.
-
-</details>
-
 
 ## :wrench: Installation 
 
