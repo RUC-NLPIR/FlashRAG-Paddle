@@ -13,8 +13,9 @@ sys.path.append("..")
 from dataclasses import dataclass
 from nltk.tokenize import word_tokenize
 import time
-import torch
-from transformers import GPT2Tokenizer, GPT2LMHeadModel, BertTokenizer
+import paddle
+import paddle.nn.functional as F
+from paddlenlp.transformers import GPTTokenizer, GPTLMHeadModel, BertTokenizer,AutoTokenizer
 
 
 @dataclass
@@ -73,16 +74,17 @@ class SelectiveContext:
         if self.lang == "zh":
             self.tokenizer = BertTokenizer.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
         elif self.lang == "en":
-            self.tokenizer = GPT2Tokenizer.from_pretrained(self.model_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         else:
             raise NotImplementedError()
 
         if self.model_type == "gpt2":
             if self.lang == "zh":
-                self.model = GPT2LMHeadModel.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
+                self.model = GPTLMHeadModel.from_pretrained("uer/gpt2-chinese-cluecorpussmall")
             else:
-                self.model = GPT2LMHeadModel.from_pretrained(self.model_path)
-            self.model.to("cuda")
+                # self.model = GPTLMHeadModel.from_pretrained(self.model_path, convert_from_torch=True)
+                self.model = GPTLMHeadModel.from_pretrained(self.model_path)
+            # self.model.to("cuda")
             self.model.eval()
 
             print("model loaded")
@@ -107,21 +109,21 @@ class SelectiveContext:
             text = f"<|endoftext|>{text}"
         elif self.lang == "zh":
             text = f"[CLS]{text}"
-        with torch.inference_mode(mode=True):
+        with paddle.no_grad():
             encoding = self.tokenizer(
-                text, max_length=1024, truncation=True, add_special_tokens=False, return_tensors="pt"
+                text, max_length=1024, truncation=True, add_special_tokens=False, return_tensors="pd"
             )
-            encoding = encoding.to(self.model.device)
-            outputs = self.model(**encoding)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=-1)
-            self_info = -torch.log(probs)
+            # encoding = encoding.to(self.model.device)
+            # outputs = self.model(**encoding)
+            outputs = self.model(encoding.input_ids)
+            logits = outputs
+            probs = F.softmax(logits, axis=-1)
+            self_info = -paddle.log(probs)
 
         input_ids = encoding["input_ids"]
         input_ids_expaned = input_ids[:, 1:].unsqueeze(-1)
-
         tokens = [self.tokenizer.decode(token_) for token_ in input_ids.squeeze().tolist()[1:]]
-        return tokens, self_info[:, :-1].gather(-1, input_ids_expaned).squeeze(-1).squeeze(0).tolist()
+        return tokens, self_info[:, :-1].take_along_axis(input_ids_expaned, -1).squeeze(-1).squeeze(0).tolist()
 
     def _get_self_info_via_curie(self, text: str) -> Tuple[List[str], List[float]]:
         num_retry = 3
