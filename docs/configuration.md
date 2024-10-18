@@ -75,10 +75,10 @@ model2path:
   e5: "intfloat/e5-base-v2"
   bge: "intfloat/e5-base-v2"
   contriever: "facebook/contriever"
-  llama2-7B-chat: "meta-llama/Llama-2-7b-chat-hf"
-  llama2-7B: "meta-llama/Llama-2-7b-hf"
-  llama2-13B: "meta-llama/Llama-2-13b-hf"
-  llama2-13B-chat: "meta-llama/Llama-2-13b-chat-hf"
+  llama2-7B-chat: "meta-llama/Llama-2-7b-chat"
+  llama2-7B: "meta-llama/Llama-2-7b"
+  llama2-13B: "meta-llama/Llama-2-13b"
+  llama2-13B-chat: "meta-llama/Llama-2-13b-chat"
   
 # Pooling methods for each embedding model
 model2pooling:
@@ -142,7 +142,7 @@ rerank_batch_size: 256 # batch size for reranker
 rerank_use_fp16: True
 
 # -------------------------------------------------Generator Settings------------------------------------------------#
-framework: hf # inference frame work of LLM, supporting: 'hf', 'openai'
+framework: pd # inference frame work of LLM, supporting: 'pd', 'openai'
 generator_model: "llama3-8B-instruct" # name or path of the generator model
 # setting for openai model, only valid in openai framework
 openai_setting:
@@ -179,10 +179,10 @@ model2path:
   e5: "intfloat/e5-base-v2"
   bge: "intfloat/e5-base-v2"
   contriever: "facebook/contriever"
-  llama2-7B-chat: "meta-llama/Llama-2-7b-chat-hf"
-  llama2-7B: "meta-llama/Llama-2-7b-hf"
-  llama2-13B: "meta-llama/Llama-2-13b-hf"
-  llama2-13B-chat: "meta-llama/Llama-2-13b-chat-hf"
+  llama2-7B-chat: "meta-llama/Llama-2-7b-chat"
+  llama2-7B: "meta-llama/Llama-2-7b"
+  llama2-13B: "meta-llama/Llama-2-13b"
+  llama2-13B-chat: "meta-llama/Llama-2-13b-chat"
   
 # Pooling methods for each embedding model
 model2pooling:
@@ -278,7 +278,7 @@ If set `use_sentence_transformer` to `True`, there is no need to set consider po
 This section records various settings for the generator.
 
 ```yaml
-framework: hf # inference frame work of LLM, supporting: 'hf', 'openai'
+framework: pd # inference frame work of LLM, supporting: 'pd', 'openai'
 generator_model: "llama3-8B-instruct" # name or path of the generator model
 # setting for openai model, only valid in openai framework
 openai_setting:
