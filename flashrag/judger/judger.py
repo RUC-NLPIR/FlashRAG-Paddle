@@ -3,11 +3,10 @@ import json
 from tqdm.auto import trange
 from collections import Counter
 import numpy as np
-import torch
+import paddle
 import faiss
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from flashrag.retriever.utils import load_model, pooling
-
 
 class BaseJudger:
     """Base object of Judger, used for judging whether to retrieve"""
@@ -62,20 +61,22 @@ class SKRJudger(BaseJudger):
         faiss_index.add(all_embeddings)
         self.faiss = faiss_index
 
-    @torch.inference_mode(mode=True)
+    @paddle.no_grad()
     def encode(self, contents: list):
         inputs = self.tokenizer(
             contents,
             padding=True,
             truncation=True,
-            return_tensors="pt",
+            return_tensors="pd",
             max_length=self.max_length,
-        ).to("cuda")
+        )
         output = self.encoder(**inputs, return_dict=True)
-        embeddings = pooling(output.pooler_output, output.last_hidden_state, inputs["attention_mask"], "pooler")
+        # print(inputs)
+        # embeddings = pooling(output.pooler_output, output.last_hidden_state, inputs["attention_mask"], "pooler")
+        embeddings = pooling(output.pooler_output, output.last_hidden_state, None, "pooler")
 
-        embeddings = cast(torch.Tensor, embeddings)
-        embeddings = torch.nn.functional.normalize(embeddings, dim=-1).detach()
+        embeddings = cast(paddle.Tensor, embeddings)
+        embeddings = paddle.nn.functional.normalize(embeddings, axis=-1).detach()
 
         all_embeddings = embeddings.cpu().numpy()
         # all_embeddings = np.concatenate(all_embeddings, axis=0)
@@ -131,12 +132,12 @@ class AdaptiveJudger(BaseJudger):
         self.batch_size = self.judger_config.get("batch_size", 16)
         self.max_length = self.judger_config.get("max_length", 512)
 
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path)
+        # self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path)
+        self.model = AutoModel.from_pretrained(self.model_path)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model.eval()
-        self.model.cuda()
 
-    @torch.inference_mode(mode=True)
+    @paddle.no_grad()
     def judge(self, dataset):
         questions = dataset.question
         questions = [q.strip() for q in questions]
@@ -149,23 +150,23 @@ class AdaptiveJudger(BaseJudger):
                 truncation=True,
                 padding=True,
                 max_length=512,
-                return_tensors="pt",
-            ).to(self.model.device)
+                return_tensors="pd",
+            )
 
             scores = self.model.generate(
                 **batch_input, return_dict_in_generate=True, output_scores=True, max_length=self.max_length
             ).scores[0]
 
             probs = (
-                torch.nn.functional.softmax(
-                    torch.stack(
+                paddle.nn.functional.softmax(
+                    paddle.stack(
                         [
                             scores[:, self.tokenizer("A").input_ids[0]],
                             scores[:, self.tokenizer("B").input_ids[0]],
                             scores[:, self.tokenizer("C").input_ids[0]],
                         ]
                     ),
-                    dim=0,
+                    axis=0,
                 )
                 .detach()
                 .cpu()
