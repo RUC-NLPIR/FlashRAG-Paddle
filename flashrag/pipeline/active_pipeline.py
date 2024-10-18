@@ -1,7 +1,7 @@
 import re
 from tqdm import tqdm
 import numpy as np
-from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
+from paddlenlp.transformers import AutoTokenizer,PretrainedTokenizerFast,PretrainedTokenizer
 from flashrag.utils import get_retriever, get_generator, selfask_pred_parse, ircot_pred_parse
 from flashrag.pipeline import BasicPipeline
 from flashrag.dataset import get_batch_dataset, merge_batch_dataset
@@ -699,7 +699,7 @@ class FLAREPipeline(BasicPipeline):
     def get_next_sentence(self, output, scores):
         tokenizer = self.generator.tokenizer
         text_sentences = re.split(r"(?<=[^A-Z].[.?]) +", output)
-        if isinstance(tokenizer, (PreTrainedTokenizer, PreTrainedTokenizerFast)):
+        if isinstance(tokenizer, (PretrainedTokenizer, PretrainedTokenizerFast)):
             token_id_sentences = [tokenizer.encode(s, add_special_tokens=False) for s in text_sentences]
         else:
             token_id_sentences = [tokenizer.encode(s, allowed_special="all") for s in text_sentences]
@@ -719,7 +719,7 @@ class FLAREPipeline(BasicPipeline):
         new_query = None
         if not judge_result:
             tokenizer = self.generator.tokenizer
-            if isinstance(tokenizer, (PreTrainedTokenizer, PreTrainedTokenizerFast)):
+            if isinstance(tokenizer, (PretrainedTokenizer, PretrainedTokenizerFast)):
                 sent_ids = tokenizer.encode(sent, add_special_tokens=False)
             else:
                 sent_ids = tokenizer.encode(sent, allowed_special="all")
@@ -839,7 +839,9 @@ class SelfAskPipeline(BasicPipeline):
                 + "\n"
                 + res
             )
-            gen_out = self.generator.generate(input_prompt, stop=["Context:", "#", stop_condition])[0]
+            gen_out = self.generator.generate(input_prompt, 
+                                            #   stop=["Context:", "#", stop_condition]
+                                              )[0]
             item.update_output(f"intermediate_output_iter{idx}", gen_out)
 
             if stop_condition == "Intermediate answer:":
