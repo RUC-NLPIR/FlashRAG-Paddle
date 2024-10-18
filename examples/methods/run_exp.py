@@ -94,7 +94,7 @@ def llmlingua(args):
         Official repo: https://github.com/microsoft/LLMLingua
     """
     refiner_name = "longllmlingua"  #
-    refiner_model_path = "model/llama-2-7b-hf"
+    refiner_model_path = "model/llama-2-7b"
 
     config_dict = {
         "refiner_name": refiner_name,
@@ -189,7 +189,7 @@ def sc(args):
             ```
     """
     refiner_name = "selective-context"
-    refiner_model_path = "model/gpt2"
+    refiner_model_path = "gpt2-medium-en"
 
     config_dict = {
         "refiner_name": refiner_name,
@@ -560,6 +560,7 @@ if __name__ == "__main__":
     parser.add_argument("--split", type=str)
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--gpu_id", type=str)
+    parser.add_argument("--pd_gpu_id", type=int)
 
     func_dict = {
         "AAR-contriever": aar,
@@ -582,6 +583,11 @@ if __name__ == "__main__":
     }
 
     args = parser.parse_args()
+
+    from paddle.device import set_device
+    set_device('gpu:{}'.format(args.pd_gpu_id))
+    import paddle
+    paddle.disable_static()
 
     func = func_dict[args.method_name]
     func(args)
