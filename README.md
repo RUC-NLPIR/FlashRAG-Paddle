@@ -1,4 +1,7 @@
-# <div align="center">⚡FlashRAG: A Python Toolkit for Efficient RAG Research<div>
+# <div align="center">⚡FlashRAG-Paddle: Efficient RAG Toolkit Based on Paddle<div>
+
+>[!Note]
+> This project is the migration of [FlashRAG repository](https://github.com/RUC-NLPIR/FlashRAG) under PaddlePaddle and PaddleNLP.
 
 
 <div align="center">
