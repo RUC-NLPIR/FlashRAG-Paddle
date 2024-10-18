@@ -1,9 +1,10 @@
 from typing import List
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from flashrag.retriever.encoder import Encoder
 from tqdm import tqdm
 import re
-import torch
+import paddle
 import numpy as np
 
 class BaseRefiner:
@@ -174,8 +175,8 @@ class ExtractiveRefiner(BaseRefiner):
             
             flatten_batch_sents = sum(batch_sents, [])
             sent_embs = []
-            for s_index in tqdm(range(0, len(flatten_batch_sents), self.mini_batch_size), desc='Sentence encoding..,'):
-                mini_batch_sents = flatten_batch_sents[s_index:s_index+self.mini_batch_size]
+            for s_index in tqdm(range(0, len(flatten_batch_sents), self.mini_batchsize), desc='Sentence encoding..,'):
+                mini_batch_sents = flatten_batch_sents[s_index:s_index+self.mini_batchsize]
                 mini_sent_embs = self.encoder.encode(mini_batch_sents, is_query=False)
                 sent_embs.append(mini_sent_embs)
             sent_embs = np.concatenate(sent_embs, axis=0)
@@ -195,7 +196,7 @@ class ExtractiveRefiner(BaseRefiner):
                 retain_lists.append(sent_list)
                 continue
 
-            topk_idxs = torch.topk(torch.Tensor(sent_scores), min(self.topk, len(sent_scores))).indices.tolist()
+            topk_idxs = paddle.topk(paddle.to_tensor(sent_scores), min(self.topk, len(sent_scores))).indices.tolist()
             retain_lists.append([sent_list[idx] for idx in sorted(topk_idxs) if idx < len(sent_list)])
 
         return [" ".join(sents) for sents in retain_lists]
@@ -214,8 +215,9 @@ class AbstractiveRecompRefiner(BaseRefiner):
 
         # load model
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path)
-        self.model.cuda()
+        # self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path)
+        self.model = AutoModelForConditionalGeneration.from_pretrained(self.model_path, convert_from_torch=True)
+        # self.model.to('gpu')
         self.model.eval()
 
     def batch_run(self, dataset, batch_size=2):
@@ -238,11 +240,10 @@ class AbstractiveRecompRefiner(BaseRefiner):
         for idx in tqdm(range(0, len(format_inputs), batch_size), desc="Refining process: "):
             batch_inputs = format_inputs[idx : idx + batch_size]
             batch_inputs = self.tokenizer(
-                batch_inputs, return_tensors="pt", padding=True, truncation=True, max_length=self.max_input_length
-            ).to(self.device)
+                batch_inputs, return_tensors="pd", padding=True, truncation=True, max_length=self.max_input_length
+            )
 
-            batch_outputs = self.model.generate(**batch_inputs, max_length=self.max_output_length)
-
+            batch_outputs = self.model.generate(**batch_inputs, max_length=self.max_output_length)[0]
             batch_outputs = self.tokenizer.batch_decode(
                 batch_outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
