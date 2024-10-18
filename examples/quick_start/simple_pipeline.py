@@ -3,6 +3,9 @@ from flashrag.config import Config
 from flashrag.utils import get_dataset
 from flashrag.pipeline import SequentialPipeline
 from flashrag.prompt import PromptTemplate
+import paddle
+paddle.device.set_device("gpu:0")
+paddle.disable_static()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str)
