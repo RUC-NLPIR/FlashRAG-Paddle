@@ -29,17 +29,13 @@ def get_dataset(config):
 
 def get_generator(config, **params):
     """Automatically select generator class based on config."""
-    if config["framework"] == "vllm":
-        return getattr(importlib.import_module("flashrag.generator"), "VLLMGenerator")(config, **params)
-    elif config["framework"] == "fschat":
-        return getattr(importlib.import_module("flashrag.generator"), "FastChatGenerator")(config, **params)
-    elif config["framework"] == "hf":
+    if config["framework"] == "pd":
         model_config = AutoConfig.from_pretrained(config["generator_model_path"])
         arch = model_config.architectures[0]
         if "t5" in arch.lower() or "bart" in arch.lower():
             return getattr(importlib.import_module("flashrag.generator"), "EncoderDecoderGenerator")(config, **params)
         else:
-            return getattr(importlib.import_module("flashrag.generator"), "HFCausalLMGenerator")(config, **params)
+            return getattr(importlib.import_module("flashrag.generator"), "PDCausalLMGenerator")(config, **params)
     elif config["framework"] == "openai":
         return getattr(importlib.import_module("flashrag.generator"), "OpenaiGenerator")(config, **params)
     else:
