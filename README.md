@@ -47,11 +47,10 @@ With FlashRAG-Paddle and our provided resources, you can effortlessly reproduce 
 
 - **Comprehensive Benchmark Datasets**: A collection of 32 pre-processed RAG benchmark datasets to test and validate RAG models' performances.
 
-- **Pre-implemented Advanced RAG Algorithms**: Features 15 advancing RAG algorithms with reported results, based on our framework. Easily reproducing results under different settings.
+- **Pre-implemented Advanced RAG Algorithms**: Features 9 advancing RAG algorithms with reported results, based on our framework. Easily reproducing results under different settings.
 
 - **Efficient Preprocessing Stage**: Simplifies the RAG workflow preparation by providing various scripts like corpus processing for retrieval, retrieval index building, and pre-retrieval of documents.
 
-- **Optimized Execution**: The library's efficiency is enhanced with tools like vLLM, FastChat for LLM inference acceleration, and Faiss for vector index management.
 
 ## :wrench: Installation 
 
