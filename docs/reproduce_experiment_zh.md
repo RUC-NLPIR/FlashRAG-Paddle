@@ -113,10 +113,11 @@
 python run_exp.py --method_name 'naive' \
                   --split 'test' \
                   --dataset_name 'nq' \
-                  --gpu_id '0,1,2,3'
+                  --gpu_id '0,1,2,3' \
+                  --pd_gpu_id 0
 ```
 
 可以从以下方法中选择：
 ```
-naive zero-shot AAR-contriever llmlingua recomp selective-context sure replug skr flare iterretgen ircot trace
+naive zero-shot AAR-contriever llmlingua recomp selective-context ret-robust replug skr iterretgen ircot
 ```
