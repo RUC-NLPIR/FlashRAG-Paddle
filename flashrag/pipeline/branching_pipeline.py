@@ -3,7 +3,7 @@ from typing import List
 import re
 from tqdm import tqdm
 import numpy as np
-from transformers import LogitsProcessorList
+from paddlenlp.generation import LogitsProcessorList
 from flashrag.utils import get_retriever, get_generator
 from flashrag.pipeline import BasicPipeline
 from flashrag.prompt import PromptTemplate
@@ -30,7 +30,7 @@ class REPLUGPipeline(BasicPipeline):
         return f"Document(Title: {title}): {text}"
 
     def run(self, dataset, do_eval=True, pred_process_fun=None):
-        import torch
+        import paddle
         from flashrag.pipeline.replug_utils import REPLUGLogitsProcessor
 
         input_query = dataset.question
@@ -45,7 +45,7 @@ class REPLUGPipeline(BasicPipeline):
             docs = [self.format_reference(doc_item) for doc_item in item.retrieval_result]
             prompts = self.build_single_doc_prompt(question=item.question, doc_list=docs)
 
-            scores = torch.tensor(item.doc_scores, dtype=torch.float32).to(self.device)
+            scores = paddle.to_tensor(item.doc_scores, dtype='float32')
             output = self.generator.generate(
                 prompts, batch_size=len(docs), logits_processor=LogitsProcessorList([REPLUGLogitsProcessor(scores)])
             )
