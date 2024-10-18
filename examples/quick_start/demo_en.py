@@ -2,7 +2,9 @@ import streamlit as st
 from flashrag.config import Config
 from flashrag.utils import get_retriever, get_generator
 from flashrag.prompt import PromptTemplate
-
+import paddle
+paddle.device.set_device("gpu:0")
+paddle.disable_static()
 
 config_dict = {
     "save_note": "demo",
