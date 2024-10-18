@@ -39,18 +39,9 @@
 
 **Selective-Context**：我们使用 GPT2 输出困惑度，并将压缩率设置为0.5。与 LongLLMLingua 类似，我们使用检索到的文档作为输入到细化器。
 
-**Ret-Robust**：这种方法专注于优化生成模型，使用 Self-Ask 提示方法进行训练。作者提供了在 NQ 和 2WikiMultihopQA 上训练的 LoRA 模型 [这里](https://huggingface.co/Ori/llama-2-13b-peft-nq-retrobust)。因此，我们使用加载了相应 LoRA 的 Llama2-13B 模型进行测试。由于 HotpotQA 没有训练模型，我们使用 2WikiMultihopQA LoRA。对于剩余的数据集，我们使用 NQ LoRA。我们将最大交互轮次设置为5，最大输出 Token 设置为100。对于 HotpotQA 和 2WikiMultihopQA，我们禁用了 `single_hop` 设置，以允许过程自动将复杂查询分解为多个迭代。
-
-**SuRe**：这种方法提示模型生成候选答案、评分并对它们进行排名，选择最佳答案。为确保一致性，我们使用原始论文中提供的提示，这些提示可以与我们的代码实现一起参考。
+**Ret-Robust**：这种方法专注于优化生成模型，使用 Self-Ask 提示方法进行训练。作者提供了在 NQ 和 2WikiMultihopQA 上训练的 LoRA 模型 [这里](https://huggingface.co/Ori/llama-2-13b-peft-nq-retrobust)(需要先转化为paddle版本的权重)。因此，我们使用加载了相应 LoRA 的 Llama2-13B 模型进行测试。由于 HotpotQA 没有训练模型，我们使用 2WikiMultihopQA LoRA。对于剩余的数据集，我们使用 NQ LoRA。我们将最大交互轮次设置为5，最大输出 Token 设置为100。对于 HotpotQA 和 2WikiMultihopQA，我们禁用了 `single_hop` 设置，以允许过程自动将复杂查询分解为多个迭代。
 
 **SKR**：我们实现了 SKR-knn 方法，它需要一个编码器模型和推理时的训练数据。具体来说，它根据输入查询从训练数据中识别最相似的查询，确定输入查询是否需要检索。我们的库包括作者提供的训练数据；相应的编码器模型可以从 [这里](https://huggingface.co/princeton-nlp/sup-simcse-bert-base-uncased) 下载。
 
-**Self-RAG**：我们使用 Self-RAG 提供的 Llama2-7B 检查点 [这里](https://huggingface.co/selfrag/selfrag_llama2_7b)，将最大输出 Token 设置为100以确保正常运行。温度设置为0，`top_p` 设置为1。
-
 **IRCoT**：对于所有实验，我们使用一次示例来添加提示。示例来自 IRCoT 提供的 [演示文件](https://github.com/StonyBrookNLP/ircot/blob/main/prompts/2wikimultihopqa/gold_with_3_distractors_context_cot_qa_codex.txt)。Max iter 设置为2。
 
-**Trace**：这种方法需要首先从搜索结果中提取三元组，然后构建推理链。这两个步骤依赖于 LLM 的提示。遵循原始工作，我们使用 Llama3-8B-instruct 来执行这些步骤，在每个提示中使用3个示例。对于没有示例的数据集，我们使用 2WikiMultihopQA 的示例作为替代。其他超参数遵循我们代码中的默认设置。
-
-**Spring**：这个模型需要将虚拟 Token 的嵌入纳入训练，除了它自己的生成器之外。由于只训练了 llama2 系列的模型，我们在 `llama2-7B-chat` 上进行了实验。
-
-**Adaptive-RAG**: 这个方法需要一个分类器对查询进行分类。由于作者没有提供官方的checkpoint模型，我们在实验中使用了其他人在Huggingface上训练的模型（这可能会导致结果不一致）。如果官方开源模型在未来发布，我们将更新实验结果。
