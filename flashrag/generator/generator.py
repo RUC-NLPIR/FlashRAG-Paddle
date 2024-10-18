@@ -157,7 +157,7 @@ class EncoderDecoderGenerator(BaseGenerator):
 
 
 class PDCausalLMGenerator(BaseGenerator):
-    """Class for decoder-only generator, based on hf."""
+    """Class for decoder-only generator."""
 
     def __init__(self, config, model=None):
         super().__init__(config)
