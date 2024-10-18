@@ -33,8 +33,6 @@ Table of Contents:
 - [Selective-Context](#selective-context)
 - [Ret-Robust](#ret-robust)
 - [SKR](#skr)
-- [Self-RAG](#self-rag)
-- [Spring](#spring)
 
 #### AAR
 
@@ -84,27 +82,6 @@ This method requires an embedding model and training data used during the infere
 - Additional Step3: Fill in the embedding model path in the `model_path` of the `skr` function
 - Additional Step4: Fill in the training data path in the `training_data_path` of the `skr` function
 
-#### Self-RAG
-
-This method requires using a trained model and currently only supports running in the `vllm` framework.
-
-- Additional Step1: Download the Self-RAG model (from [7B model](https://huggingface.co/selfrag/selfrag_llama2_7b), [13B model](https://huggingface.co/selfrag/selfrag_llama2_13b))
-- Additional Step2: Modify the `generator_model_path` in the `selfrag` function.
-
-#### Spring
-This method requires a virtual token embedding file and currently only supports running in the `hf` framework.
-
-- Additional Step1: Download virtual token embedding file from [official repo](https://huggingface.co/yutaozhu94/SPRING)
-- Additional Step2: Modify the `token_embedding_path` in the `spring` function.
-
-#### Adaptive-RAG
-
-This method requires a classifier to classify the query. Since the author did not provide an official checkpoint, we used a checkpoint trained by others on Huggingface for the experiment (which may result in inconsistent results).
-
-If the official open-source checkpoint is released in the future, we will update the experimental results.
-
-- Additional Step1: Download classifier model from huggingface repo (**not official**): [illuminoplanet/combined_flan_t5_xl_classifier](https://huggingface.co/illuminoplanet/combined_flan_t5_xl_classifier)
-- Additional Step2: Modify the `model_path` in `adaptive` function.
 
 ### 3. Run methods
 
@@ -114,10 +91,11 @@ Run the experiment on the NQ dataset using the following command.
 python run_exp.py --method_name 'naive' \
                   --split 'test' \
                   --dataset_name 'nq' \
-                  --gpu_id '0,1,2,3'
+                  --gpu_id '0,1,2,3' \
+                  --pd_gpu_id 0
 ```
 
 The method can be selected from the following:
 ```
-naive zero-shot AAR-contriever llmlingua recomp selective-context sure replug skr flare iterretgen ircot trace
+naive zero-shot AAR-contriever llmlingua recomp selective-context ret-robust replug skr iterretgen ircot
 ```
