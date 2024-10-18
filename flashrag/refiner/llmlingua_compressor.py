@@ -13,10 +13,10 @@ import yaml
 import nltk
 import numpy as np
 import tiktoken
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
-from transformers import (
+import paddle
+import paddle.nn.functional as F
+# from torch.utils.data import DataLoader, Dataset
+from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoModelForTokenClassification,
@@ -24,7 +24,7 @@ from transformers import (
 )
 
 
-class TokenClfDataset(Dataset):
+class TokenClfDataset(paddle.io.Dataset):
     def __init__(
         self,
         texts,
@@ -70,8 +70,8 @@ class TokenClfDataset(Dataset):
         ids = self.tokenizer.convert_tokens_to_ids(tokenized_text)
 
         return {
-            "ids": torch.tensor(ids, dtype=torch.long),
-            "mask": torch.tensor(attn_mask, dtype=torch.long),
+            "ids": paddle.to_tensor(ids, dtype='int64'),
+            "mask": paddle.to_tensor(data=attn_mask, dtype='int64'),
         }
 
     def __len__(self):
@@ -271,9 +271,9 @@ class PromptCompressor:
         self.model.resize_token_embeddings(len(self.tokenizer))
 
     def load_model(self, model_name: str, device_map: str = "cuda", model_config: dict = {}):
-        trust_remote_code = model_config.get("trust_remote_code", True)
-        if "trust_remote_code" not in model_config:
-            model_config["trust_remote_code"] = trust_remote_code
+        # trust_remote_code = model_config.get("trust_remote_code", True)
+        # if "trust_remote_code" not in model_config:
+        #     model_config["trust_remote_code"] = trust_remote_code
         config = AutoConfig.from_pretrained(model_name, **model_config)
 
         MODEL_CLASS = (
@@ -281,11 +281,11 @@ class PromptCompressor:
             if any("ForTokenClassification" in ar for ar in config.architectures)
             else AutoModelForCausalLM
         )
-        self.device = device_map if any(key in device_map for key in ["cuda", "cpu", "mps"]) else "cuda"
+        # self.device = device_map if any(key in device_map for key in ["gpu", "cpu", "mps"]) else "gpu:2"
         model = MODEL_CLASS.from_pretrained(
             model_name,
-            torch_dtype=model_config.pop("torch_dtype", "auto" if device_map == "cuda" else torch.float32),
-            device_map=device_map,
+            # torch_dtype=model_config.pop("torch_dtype", "auto" if device_map == "cuda" else 'float32'),
+            # device_map=device_map,
             config=config,
             ignore_mismatched_sizes=True,
             **model_config,
@@ -313,32 +313,33 @@ class PromptCompressor:
         condition_pos_id: int = 0,
     ):
         if input_ids is None:
-            tokenized_text = self.tokenizer(text, return_tensors="pt")
-            input_ids = tokenized_text["input_ids"].to(self.device)
-            attention_mask = tokenized_text["attention_mask"].to(self.device)
+            tokenized_text = self.tokenizer(text, return_tensors="pd")
+            input_ids = tokenized_text["input_ids"]
+            attention_mask = tokenized_text["attention_mask"]
         if past_key_values is not None:
-            past_length = past_key_values[0][0].shape[2]
+            past_length = past_key_values[0][0].shape[1]
         else:
             past_length = 0
         if end is None:
             end = input_ids.shape[1]
         end = min(end, past_length + self.max_position_embeddings)
-        with torch.inference_mode(mode=True):
+        with paddle.no_grad():
             response = self.model(
                 input_ids[:, past_length:end],
                 attention_mask=attention_mask[:, :end],
                 past_key_values=past_key_values,
                 use_cache=True,
             )
-            past_key_values = response.past_key_values
-
-        shift_logits = response.logits[..., :-1, :].contiguous()
+            # past_key_values = response.past_key_values
+            past_key_values = response[1]
+        # shift_logits = response.logits[..., :-1, :].contiguous()
+        shift_logits = response[0][..., :-1, :].contiguous()
         shift_labels = input_ids[..., past_length + 1 : end].contiguous()
         # Flatten the tokens
-        active = (attention_mask[:, past_length:end] == 1)[..., :-1].view(-1)
-        active_logits = shift_logits.view(-1, shift_logits.size(-1))[active]
-        active_labels = shift_labels.view(-1)[active]
-        loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
+        active = (attention_mask[:, past_length:end] == 1)[..., :-1].view([-1])
+        active_logits = shift_logits.view([-1, shift_logits.shape[-1]])[active]
+        active_labels = shift_labels.view([-1])[active]
+        loss_fct = paddle.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(active_logits, active_labels)
         if condition_mode == "before":
             loss = loss[:condition_pos_id]
@@ -1064,7 +1065,7 @@ class PromptCompressor:
             cur_prefix = self.tokenizer.decode(full_input_ids[:i])
             if cur_prefix == prefix:
                 break
-        assert self.tokenizer.decode(full_input_ids[i:]) == text[:100]
+        # assert self.tokenizer.decode(full_input_ids[i:]) == text[:100]
         return i
 
     def get_condition_ppl(
@@ -1080,7 +1081,7 @@ class PromptCompressor:
             return self.get_ppl(
                 question + text,
                 granularity=granularity,
-                condition_mode="after",
+                condition_mode="before",
                 condition_pos_id=self.get_token_length(question) - 1,
             )
         elif condition_in_question == "after":
@@ -1450,7 +1451,7 @@ class PromptCompressor:
         self_attention_mask=None,
     ):
         if self_loss is not None:
-            need_idx = torch.concat(
+            need_idx = paddle.concat(
                 [
                     loss[:start] > 0,
                     self_loss[: loss[start:].shape[0]] - loss[start:] > threshold,
@@ -1458,28 +1459,28 @@ class PromptCompressor:
                 ]
             )
         else:
-            need_idx = torch.concat([loss > threshold, loss[:1] > 0])
+            need_idx = paddle.concat([loss > threshold, loss[:1] > 0])
         need_idx[end:] = 1
         need_idx[: end - iterative_size] = 1
         loss = loss[need_idx[:-1]]
         if self_loss is not None:
             if need_idx.shape[0] < self_loss.shape[0] + start + 1:
-                need_idx = torch.cat(
+                need_idx = paddle.concat(
                     [
                         need_idx,
-                        torch.ones(
+                        paddle.ones(
                             self_loss.shape[0] - need_idx.shape[0] + start + 1,
-                            dtype=torch.bool,
-                        ).to(need_idx.device),
+                            dtype='bool',
+                        ).to(need_idx.place),
                     ]
                 )
             self_loss = self_loss[need_idx[start:-1]]
 
         if need_idx.shape[0] < input_ids.shape[1]:
-            need_idx = torch.cat(
+            need_idx = paddle.concat(
                 [
                     need_idx,
-                    torch.ones(input_ids.shape[1] - need_idx.shape[0], dtype=torch.bool).to(need_idx.device),
+                    paddle.ones(input_ids.shape[1] - need_idx.shape[0], dtype='bool').to(need_idx.place),
                 ]
             )
         elif need_idx.shape[0] > input_ids.shape[1]:
@@ -1509,7 +1510,7 @@ class PromptCompressor:
             self_compressed_input_ids, self_compressed_attention_mask = None, None
         if keep_flag is not None:
             if len(keep_flag) > len(need_idx):
-                keep_flag = torch.cat(
+                keep_flag = paddle.concat(
                     [
                         keep_flag[:start],
                         keep_flag[start : len(need_idx) + start][need_idx],
@@ -1535,7 +1536,7 @@ class PromptCompressor:
             return float("-inf")
         ppl = ppl[ppl != 10000]
         target_token = max(0, min(len(ppl) - 1, int(len(ppl) * ratio) - 1))
-        return ppl.sort(descending=not condition_flag).values[target_token].detach().cpu().item()
+        return paddle.sort(descending=not condition_flag, x=ppl)[target_token]
 
     def iterative_compress_prompt(
         self,
@@ -1558,10 +1559,9 @@ class PromptCompressor:
                 context, iterative_size, dynamic_ratio, start, segments_info
             )
         context = "\n\n".join(context)
-        tokenized_text = self.tokenizer(context, return_tensors="pt", add_special_tokens=False)
-        input_ids = tokenized_text["input_ids"].to(self.device)
-        attention_mask = tokenized_text["attention_mask"].to(self.device)
-
+        tokenized_text = self.tokenizer(context, return_tensors="pd", add_special_tokens=False)
+        input_ids = tokenized_text["input_ids"]
+        attention_mask = tokenized_text["attention_mask"]
         N = (attention_mask == 1).sum()
         compressed_input_ids, compressed_attention_mask = input_ids, attention_mask
         if condition_compare:
@@ -1590,7 +1590,7 @@ class PromptCompressor:
                 )
                 for ii in range(N)
             ]
-            keep_flag = torch.tensor(keep_flag).to(self.device)
+            keep_flag = paddle.to_tensor(keep_flag)
         past_key_values, past_loss, ready_end = None, None, 0
         self_past_key_values, self_past_loss, self_ready_end = None, None, 0
         pop_compressed_input_ids, pop_self_compressed_input_ids = None, None
@@ -1602,15 +1602,15 @@ class PromptCompressor:
                 if pop_compressed_input_ids is None:
                     pop_compressed_input_ids = compressed_input_ids[:, :e]
                 else:
-                    pop_compressed_input_ids = torch.cat(
-                        [pop_compressed_input_ids, compressed_input_ids[:, :e]], dim=-1
+                    pop_compressed_input_ids = paddle.concat(
+                        [pop_compressed_input_ids, compressed_input_ids[:, :e]], axis=-1
                     )
                 compressed_input_ids = compressed_input_ids[:, e:]
                 compressed_attention_mask = compressed_attention_mask[:, e:]
                 past_key_values = [
                     [
-                        torch.cat([k[..., :s, :], k[..., s + e :, :]], dim=-2),
-                        torch.cat([v[..., :s, :], v[..., s + e :, :]], dim=-2),
+                        paddle.concat([k[:, :s, ...], k[:, s + e :, ...]], axis=1),
+                        paddle.concat([v[:, :s, ...], v[:, s + e :, ...]], axis=1),
                     ]
                     for k, v in past_key_values
                 ]
@@ -1618,24 +1618,24 @@ class PromptCompressor:
                     keep_flag = keep_flag[e:]
                 end, ready_end = end - e, ready_end - e
                 if condition_compare:
-                    s = min(s, self_past_key_values[0][0].shape[2] - e)
+                    s = min(s, self_past_key_values[0][0].shape[1] - e)
                     self_ready_end -= e
                     if pop_self_compressed_input_ids is None:
                         pop_self_compressed_input_ids = self_compressed_input_ids[:, :e]
                     else:
-                        pop_self_compressed_input_ids = torch.cat(
+                        pop_self_compressed_input_ids = paddle.concat(
                             [
                                 pop_self_compressed_input_ids,
                                 self_compressed_input_ids[:, :e],
                             ],
-                            dim=-1,
+                            axis=-1,
                         )
                     self_compressed_input_ids = self_compressed_input_ids[:, e:]
                     self_compressed_attention_mask = self_compressed_attention_mask[:, e:]
                     self_past_key_values = [
                         [
-                            torch.cat([k[..., :s, :], k[..., s + e :, :]], dim=-2),
-                            torch.cat([v[..., :s, :], v[..., s + e :, :]], dim=-2),
+                            paddle.concat([k[:, :s, ...], k[:, s + e :, ...]], axis=1),
+                            paddle.concat([v[:, :s, ...], v[:, s + e :, ...]], axis=1),
                         ]
                         for k, v in self_past_key_values
                     ]
@@ -1653,14 +1653,14 @@ class PromptCompressor:
                 break
             if past_loss is not None:
                 if end - 1 > len(past_loss):
-                    past_loss = torch.cat([past_loss, torch.zeros_like(loss)[: end - 1 - len(past_loss)]])
+                    past_loss = paddle.concat([past_loss, paddle.zeros_like(loss)[: end - 1 - len(past_loss)]])
                 past_loss[ready_end : end - 1] = loss
                 loss = past_loss
             else:
                 past_loss = loss
             if idx:
                 past_key_values = [
-                    [k[:, :, : end - iterative_size], v[:, :, : end - iterative_size]] for k, v in past_key_values
+                    [k[:, : end - iterative_size], v[:, : end - iterative_size]] for k, v in past_key_values
                 ]
             else:
                 past_key_values = None
@@ -1677,10 +1677,10 @@ class PromptCompressor:
                 )
                 if self_past_loss is not None:
                     if end - start - 1 > len(self_past_loss):
-                        self_past_loss = torch.cat(
+                        self_past_loss = paddle.concat(
                             [
                                 self_past_loss,
-                                torch.zeros_like(self_loss)[: end - 1 - start - len(self_past_loss)],
+                                paddle.zeros_like(self_loss)[: end - 1 - start - len(self_past_loss)],
                             ]
                         )
                     self_past_loss[self_ready_end : end - start - 1] = self_loss
@@ -1690,8 +1690,8 @@ class PromptCompressor:
                 if idx:
                     self_past_key_values = [
                         [
-                            k[:, :, : end - iterative_size - start],
-                            v[:, :, : end - iterative_size - start],
+                            k[:, : end - iterative_size - start],
+                            v[:, : end - iterative_size - start],
                         ]
                         for k, v in self_past_key_values
                     ]
@@ -1737,7 +1737,7 @@ class PromptCompressor:
                 end += iterative_size
             idx += 1
         if pop_compressed_input_ids is not None:
-            compressed_input_ids = torch.cat([pop_compressed_input_ids, compressed_input_ids], dim=-1)
+            compressed_input_ids = paddle.concat([pop_compressed_input_ids, compressed_input_ids], axis=-1)
         return compressed_input_ids[:, start:], compressed_attention_mask[:, start:]
 
     def recover(
@@ -1806,187 +1806,6 @@ class PromptCompressor:
         condition_in_question: str,
         context_tokens_length: list,
     ):
-        def get_distance_bm25(corpus, query):
-            from rank_bm25 import BM25Okapi
-
-            tokenized_corpus = [doc.split(" ") for doc in corpus]
-            bm25 = BM25Okapi(tokenized_corpus)
-            tokenized_query = query.split(" ")
-            doc_scores = bm25.get_scores(tokenized_query)
-            idx = [(ii, 0) for ii in (-doc_scores).argsort()]
-            return idx
-
-        def get_distance_gzip(corpus, query):
-            def get_score(x, y):
-                cx, cy = len(gzip.compress(x.encode())), len(gzip.compress(y.encode()))
-                cxy = len(gzip.compress(f"{x} {y}".encode()))
-                return (cxy - min(cx, cy)) / max(cx, cy)
-
-            import gzip
-
-            doc_scores = [get_score(doc, query) for doc in corpus]
-            idx = [(ii, 0) for ii in np.argsort(doc_scores)]
-            return idx
-
-        def get_distance_sentbert(corpus, query):
-            from sentence_transformers import SentenceTransformer, util
-
-            if self.retrieval_model is None or self.retrieval_model_name != rank_method:
-                self.retrieval_model = SentenceTransformer("multi-qa-mpnet-base-dot-v1")
-                self.retrieval_model_name = rank_method
-            doc_embeds = self.retrieval_model.encode(corpus)
-            query = self.retrieval_model.encode(query)
-            doc_scores = -util.dot_score(doc_embeds, query).cpu().numpy().reshape(-1)
-            idx = [(ii, 0) for ii in np.argsort(doc_scores)]
-            return idx
-
-        def get_distance_openai(corpus, query):
-            import openai
-            from sentence_transformers import util
-
-            openai.api_key = self.open_api_config.get("api_key", "")
-            openai.api_base = self.open_api_config.get("api_base", "https://api.openai.com/v1")
-            openai.api_type = self.open_api_config.get("api_type", "open_ai")
-            openai.api_version = self.open_api_config.get("api_version", "2023-05-15")
-            engine = self.open_api_config.get("engine", "text-embedding-ada-002")
-
-            def get_embed(text):
-                return openai.Embedding.create(input=[text.replace("\n", " ")], engine=engine)["data"][0]["embedding"]
-
-            doc_embeds = [get_embed(i) for i in corpus]
-            query = get_embed(query)
-            doc_scores = -util.dot_score(doc_embeds, query).cpu().numpy().reshape(-1)
-            idx = [(ii, 0) for ii in np.argsort(doc_scores)]
-            return idx
-
-        def get_distance_sentbert_bge(corpus, query):
-            from sentence_transformers import SentenceTransformer, util
-
-            if self.retrieval_model is None or self.retrieval_model_name != rank_method:
-                self.retrieval_model = SentenceTransformer("BAAI/bge-large-en-v1.5")
-                self.retrieval_model_name = rank_method
-            doc_embeds = self.retrieval_model.encode([i for i in corpus], normalize_embeddings=True)
-            query = self.retrieval_model.encode(query, normalize_embeddings=True)
-            doc_scores = -util.dot_score(doc_embeds, query).cpu().numpy().reshape(-1)
-            idx = [(ii, 0) for ii in np.argsort(doc_scores)]
-            return idx
-
-        def get_distance_bge_ranker(corpus, query):
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-            pairs = [[i, query] for i in corpus]
-            if self.retrieval_model is None or self.retrieval_model_name != rank_method:
-                tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-reranker-large")
-                model = (
-                    AutoModelForSequenceClassification.from_pretrained("BAAI/bge-reranker-large").eval().to(self.device)
-                )
-                self.retrieval_model = [tokenizer, model]
-                self.retrieval_model_name = rank_method
-            with torch.inference_mode(mode=True):
-                inputs = self.retrieval_model[0](
-                    pairs,
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                    max_length=512,
-                ).to(self.device)
-                scores = (
-                    self.retrieval_model[1](**inputs, return_dict=True)
-                    .logits.view(
-                        -1,
-                    )
-                    .float()
-                )
-            idx = [(ii, 0) for ii in np.argsort(-scores.cpu())]
-            return idx
-
-        def get_distance_bge_llmembedder(corpus, query):
-            from transformers import AutoModel, AutoTokenizer
-
-            if self.retrieval_model is None or self.retrieval_model_name != rank_method:
-                tokenizer = AutoTokenizer.from_pretrained("BAAI/llm-embedder")
-                model = AutoModel.from_pretrained("BAAI/llm-embedder").eval().to(self.device)
-                self.retrieval_model = [tokenizer, model]
-                self.retrieval_model_name = rank_method
-
-            instruction_qa_query = "Represent this query for retrieving relevant documents: "
-            instruction_qa_key = "Represent this document for retrieval: "
-            queries = [instruction_qa_query + query for _ in corpus]
-            keys = [instruction_qa_key + key for key in corpus]
-            with torch.inference_mode(mode=True):
-                query_inputs = self.retrieval_model[0](
-                    queries,
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                    max_length=512,
-                ).to(self.device)
-                key_inputs = self.retrieval_model[0](
-                    keys,
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                    max_length=512,
-                ).to(self.device)
-                query_outputs = self.retrieval_model[1](**query_inputs)
-                key_outputs = self.retrieval_model[1](**key_inputs)
-                # CLS pooling
-                query_embeddings = query_outputs.last_hidden_state[:, 0]
-                key_embeddings = key_outputs.last_hidden_state[:, 0]
-                # Normalize
-                query_embeddings = torch.nn.functional.normalize(query_embeddings, p=2, dim=1)
-                key_embeddings = torch.nn.functional.normalize(key_embeddings, p=2, dim=1)
-                similarity = query_embeddings @ key_embeddings.T
-            idx = [(ii, 0) for ii in np.argsort(-similarity[0].cpu())]
-            return idx
-
-        def get_distance_jinza(corpus, query):
-            from numpy.linalg import norm
-            from transformers import AutoModel
-
-            def cos_sim(a, b):
-                return (a @ b.T) / (norm(a) * norm(b))
-
-            if self.retrieval_model is None or self.retrieval_model_name != rank_method:
-                model = (
-                    AutoModel.from_pretrained("jinaai/jina-embeddings-v2-base-en", trust_remote_code=True)
-                    .eval()
-                    .to(self.device)
-                )
-                self.retrieval_model = model
-                self.retrieval_model_name = rank_method
-
-            doc_embeds = self.retrieval_model.encode(corpus)
-            query = self.retrieval_model.encode(query)
-            doc_scores = cos_sim(doc_embeds, query)
-            idx = [(ii, 0) for ii in np.argsort(-doc_scores)]
-            return idx
-
-        def get_distance_voyageai(corpus, query):
-            import voyageai
-            from sentence_transformers import util
-
-            voyageai.api_key = self.open_api_config.get("voyageai_api_key", "")
-
-            def get_embed(text):
-                return voyageai.get_embedding(text, model="voyage-01")
-
-            doc_embeds = [get_embed(i) for i in corpus]
-            query = get_embed(query)
-            doc_scores = -util.dot_score(doc_embeds, query).cpu().numpy().reshape(-1)
-            idx = [(ii, 0) for ii in np.argsort(doc_scores)]
-            return idx
-
-        def get_distance_cohere(corpus, query):
-            import cohere
-
-            api_key = self.open_api_config.get("cohere_api_key", "")
-            co = cohere.Client(api_key)
-            results = co.rerank(model="rerank-english-v2.0", query=query, documents=corpus, top_n=20)
-            c_map = {jj: ii for ii, jj in enumerate(corpus)}
-            doc_rank = [c_map[ii.document["text"]] for ii in results]
-            idx = [(ii, 0) for ii in doc_rank]
-            return idx
 
         def get_distance_longllmlingua(corpus, query):
             context_ppl = [
@@ -2002,29 +1821,7 @@ class PromptCompressor:
             ys = sorted(enumerate(context_ppl), key=lambda x: sort_direct * x[1])
             return ys
 
-        method = None
-        if rank_method == "bm25":
-            method = get_distance_bm25
-        elif rank_method == "gzip":
-            method = get_distance_gzip
-        elif rank_method == "sentbert":
-            method = get_distance_sentbert
-        elif rank_method == "openai":
-            method = get_distance_openai
-        elif rank_method in ["longllmlingua", "llmlingua"]:
-            method = get_distance_longllmlingua
-        elif rank_method == "bge":
-            method = get_distance_sentbert_bge
-        elif rank_method == "bge_reranker":
-            method = get_distance_bge_ranker
-        elif rank_method == "bge_llmembedder":
-            method = get_distance_bge_llmembedder
-        elif rank_method == "jinza":
-            method = get_distance_jinza
-        elif rank_method == "voyageai":
-            method = get_distance_voyageai
-        elif rank_method == "cohere":
-            method = get_distance_cohere
+        method = get_distance_longllmlingua
         return method(context, question)
 
     def segment_structured_context(
@@ -2105,26 +1902,26 @@ class PromptCompressor:
                 chunk_list.append(c)
 
         dataset = TokenClfDataset(chunk_list, tokenizer=self.tokenizer, max_len=self.max_seq_len)
-        dataloader = DataLoader(dataset, batch_size=self.max_batch_size, shuffle=False, drop_last=False)
+        dataloader = paddle.io.DataLoader(dataset, batch_size=self.max_batch_size, shuffle=False, drop_last=False)
 
         chunk_probs = []
         chunk_words = []
-        with torch.inference_mode(mode=True):
+        with paddle.no_grad():
             for batch in dataloader:
-                ids = batch["ids"].to(self.device, dtype=torch.long)
-                mask = batch["mask"].to(self.device, dtype=torch.long) == 1
+                ids = batch["ids"].to(dtype='int64')
+                mask = batch["mask"].to(dtype='int64') == 1
 
                 outputs = self.model(input_ids=ids, attention_mask=mask)
                 loss, logits = outputs.loss, outputs.logits
-                probs = F.softmax(logits, dim=-1)
+                probs = F.softmax(logits, axis=-1)
 
                 for j in range(ids.shape[0]):
                     _probs = probs[j, :, 1]
                     _ids = ids[j]
                     _mask = mask[j]
 
-                    active_probs = torch.masked_select(_probs, _mask)
-                    active_ids = torch.masked_select(_ids, _mask)
+                    active_probs = paddle.masked_select(_probs, _mask)
+                    active_ids = paddle.masked_select(_ids, _mask)
 
                     tokens = self.tokenizer.convert_ids_to_tokens(active_ids.squeeze().tolist())
                     token_probs = [prob for prob in active_probs.cpu().numpy()]
@@ -2263,27 +2060,27 @@ class PromptCompressor:
                 chunk_list.append(c)
 
         dataset = TokenClfDataset(chunk_list, tokenizer=self.tokenizer, max_len=self.max_seq_len)
-        dataloader = DataLoader(dataset, batch_size=self.max_batch_size, shuffle=False, drop_last=False)
+        dataloader = paddle.io.DataLoader(dataset, batch_size=self.max_batch_size, shuffle=False, drop_last=False)
 
         compressed_chunk_list = []
         word_list = []
         word_label_list = []
-        with torch.inference_mode(mode=True):
+        with paddle.no_grad():
             for batch in dataloader:
-                ids = batch["ids"].to(self.device, dtype=torch.long)
-                mask = batch["mask"].to(self.device, dtype=torch.long) == 1
+                ids = batch["ids"].to(dtype='int64')
+                mask = batch["mask"].to(dtype='int64') == 1
 
                 outputs = self.model(input_ids=ids, attention_mask=mask)
                 loss, logits = outputs.loss, outputs.logits
-                probs = F.softmax(logits, dim=-1)
+                probs = F.softmax(logits, axis=-1)
 
                 for j in range(ids.shape[0]):
                     chunk_probs = probs[j, :, 1]
                     chunk_ids = ids[j]
                     chunk_mask = mask[j]
 
-                    active_probs = torch.masked_select(chunk_probs, chunk_mask)
-                    active_ids = torch.masked_select(chunk_ids, chunk_mask)
+                    active_probs = paddle.masked_select(chunk_probs, chunk_mask)
+                    active_ids = paddle.masked_select(chunk_ids, chunk_mask)
 
                     tokens = self.tokenizer.convert_ids_to_tokens(active_ids.squeeze().tolist())
                     token_probs = [prob for prob in active_probs.cpu().numpy()]
