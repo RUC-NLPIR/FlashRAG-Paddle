@@ -1,4 +1,3 @@
-datasets
 base58
 nltk
 numpy
