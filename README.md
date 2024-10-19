@@ -28,7 +28,7 @@
 </h4>
 FlashRAG-Paddle is a Python toolkit for Retrieval Augmented Generation (RAG) research, built on the **PaddlePaddle framework and PaddleNLP**, which is optimized for Chinese-developed chips and computing platforms.
 
-Currently, FlashRAG-Paddle includes 32 pre-processed benchmark RAG datasets and 9 state-of-the-art RAG algorithms, all fully supported in the MindSpore ecosystem. We will gradually support other algorithms in the FlashRAG repository in the future.
+Currently, FlashRAG-Paddle includes 32 pre-processed benchmark RAG datasets and 9 state-of-the-art RAG algorithms, all fully supported in the Paddle ecosystem. We will gradually support other algorithms in the FlashRAG repository in the future.
 
 <p align="center">
 <img src="asset/framework.jpg">
@@ -60,7 +60,13 @@ Due to the fact that the installation of PaddlePaddle framework depends on diffe
 
 Official Installation Link: https://www.paddlepaddle.org.cn/install
 
-#### Step2: Install FlashRAG-Paddle
+#### Step2: Install paddlenlp
+
+```bash
+pip install --upgrade paddlenlp==3.0.0b2
+```
+
+#### Step3: Install FlashRAG-Paddle
 Then, simply clone it from Github and install (requires Python 3.9+): 
 
 ```bash
