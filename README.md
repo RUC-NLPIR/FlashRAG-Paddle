@@ -380,23 +380,17 @@ It’s important to note that, to ensure consistency, we have utilized a uniform
 
 | Method               | Type           | NQ (EM) | TriviaQA (EM) | Hotpotqa (F1) | 2Wiki (F1)| PopQA (F1)| WebQA(EM) | Specific setting                                                                  |
 |----------------------|----------------|---------|---------------|---------------|---------------|---------------|---------------|------------------------------------------------------------------------------------|
-| Naive Generation     | Sequential     | 22.6    | 55.7          | 28.4          |  33.9| 21.7| 18.8| |
-| Standard RAG         | Sequential     | 35.1    | 58.9          | 35.3          | 21.0 | 36.7|15.7| |
-| [AAR-contriever-kilt](https://aclanthology.org/2023.acl-long.136.pdf)  | Sequential     | 30.1    | 56.8          | 33.4          | 19.8 | 36.1  | 16.1| |
-| [LongLLMLingua](https://arxiv.org/abs/2310.06839)        | Sequential     | 32.2    | 59.2          | 37.5          |25.0| 38.7| 17.5| Compress Ratio=0.5 |
-| [RECOMP-abstractive](https://arxiv.org/pdf/2310.04408)   | Sequential     | 33.1    | 56.4          | 37.5          | 32.4 | 39.9| 20.2| |
-| [Selective-Context](https://arxiv.org/abs/2310.06201)    | Sequential     | 30.5    | 55.6          | 34.4          |18.5| 33.5| 17.3| Compress Ratio=0.5|
-| [Trace](https://arxiv.org/abs/2406.11460) | Sequential | 30.7 | 50.2 | 34.0 | 15.5 | 37.4 | 19.9 | |
-| [Spring](https://arxiv.org/abs/2405.19670) | Sequential | 37.9 | 64.6 |42.6 | 37.3 |54.8 |27.7 | Use Llama2-7B-chat with trained embedding table |
-| [SuRe](https://arxiv.org/abs/2404.13081)                 | Branching      | 37.1    | 53.2          | 33.4          |20.6|48.1|24.2| Use provided prompt|
-| [REPLUG](https://arxiv.org/abs/2301.12652)               | Branching      | 28.9    | 57.7          | 31.2          |21.1|27.8|20.2|  |
-| [SKR](https://aclanthology.org/2023.findings-emnlp.691.pdf)                  | Conditional    | 33.2   | 56.0          | 32.4          | 23.4 |31.7|17.0|Use infernece-time training data|
-|[Adaptive-RAG](https://aclanthology.org/2024.naacl-long.389.pdf) | Conditional | 35.1 | 56.6 | 39.1 | 28.4 | 40.4 | 16.0| |
-| [Ret-Robust](https://arxiv.org/abs/2310.01558)           | Loop     | 42.9    | 68.2          | 35.8          |43.4|57.2|33.7| Use LLAMA2-13B with trained lora|
-| [Self-RAG](https://arxiv.org/abs/2310.11511)             | Loop   | 36.4    | 38.2          | 29.6          | 25.1|32.7|21.9| Use trained selfrag-llama2-7B|
-| [FLARE](https://arxiv.org/abs/2305.06983)                | Loop   | 22.5    | 55.8          | 28.0          |33.9| 20.7| 20.2| |
-| [Iter-Retgen](https://arxiv.org/abs/2305.15294),      [ITRG](https://arxiv.org/abs/2310.05149)   | Loop | 36.8    | 60.1          | 38.3          | 21.6| 37.9| 18.2| |
-| [IRCoT](https://aclanthology.org/2023.acl-long.557.pdf) | Loop | 33.3| 56.9|41.5|32.4 |45.6 |20.7 | |
+| Naive Generation     | Sequential     | 22.7	|51.9	|28.1	|31.3	|23.3	|18.5| |
+| Standard RAG         | Sequential     | 34.9	|55.2	|35.3	|20.7	|35.8	|16.9| |
+| [AAR-contriever-kilt](https://aclanthology.org/2023.acl-long.136.pdf)  | Sequential     | 28.6 |51.6	|29.5	|18.2	|37.3	|15.1| |
+| [LongLLMLingua](https://arxiv.org/abs/2310.06839)        | Sequential     | 32.2	|56.6	|37.7	|22.6	|37.8	|18.2| Compress Ratio=0.5 |
+| [RECOMP-abstractive](https://arxiv.org/pdf/2310.04408)   | Sequential     | 32.5	|52.1	|37.1	|29.8	|39.5	|19.8| |
+| [Selective-Context](https://arxiv.org/abs/2310.06201)    | Sequential     | 29.2	|51.2	|31.7	|19.2	|32.3	|18| Compress Ratio=0.5|
+| [REPLUG](https://arxiv.org/abs/2301.12652)               | Branching      | 30.3	|50.1	|32.1	|17.4	|32.6	|17.7|  |
+| [SKR](https://aclanthology.org/2023.findings-emnlp.691.pdf)                  | Conditional    | 32	|55.5	|31.9	|22.9	|30.8	|17.4|Use infernece-time training data|
+| [Ret-Robust](https://arxiv.org/abs/2310.01558)           | Loop     | 43.2	|65.8	|45.2	|37.4	|58.7	|34.7| Use LLAMA2-13B with trained lora|
+| [Iter-Retgen](https://arxiv.org/abs/2305.15294),      [ITRG](https://arxiv.org/abs/2310.05149)   | Loop | 35.2	|56.4	|37.2	|20.6	|36.2	|17.9| |
+| [IRCoT](https://aclanthology.org/2023.acl-long.557.pdf) | Loop | 26.8	|46.8	|33.1	|24.1	|40.6	|18 | |
 
 
 ## :notebook: Supporting Datasets & Document Corpus
