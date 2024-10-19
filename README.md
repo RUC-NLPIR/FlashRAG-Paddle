@@ -54,32 +54,19 @@ With FlashRAG-Paddle and our provided resources, you can effortlessly reproduce 
 
 ## :wrench: Installation 
 
-To get started with FlashRAG, you can simply install it with pip:
-```base
-pip install flashrag-dev[core]
-```
+#### Step1: Install PaddlePaddle
 
-Or you can clone it from Github and install (requires Python 3.9+): 
+Due to the fact that the installation of PaddlePaddle framework depends on different hardware platforms, we do not directly install it automatically. Please follow the official installation link for installation.
+
+Official Installation Link: https://www.paddlepaddle.org.cn/install
+
+#### Step2: Install FlashRAG-Paddle
+Then, simply clone it from Github and install (requires Python 3.9+): 
 
 ```bash
-git clone https://github.com/RUC-NLPIR/FlashRAG.git
+git clone https://github.com/corejj/FlashRAG-Paddle.git
 cd FlashRAG
-pip install -e .[core] 
-```
-
-If you want to use vllm, sentence-transformers or pyserini, you can install the optional dependencies:
-```bash
-# Install all extra dependencies
-pip install flashrag[full]
-
-# Install vllm for faster speed
-pip install vllm>=0.4.1
-
-# Install sentence-transformers
-pip install sentence-transformers
-
-# Install pyserini for bm25
-pip install pyserini
+pip install -e . 
 ```
 
 Due to the incompatibility when installing `faiss` using `pip`, it is necessary to use the following conda command for installation.
