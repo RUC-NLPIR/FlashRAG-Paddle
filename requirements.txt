@@ -9,11 +9,8 @@ rank_bm25
 rouge
 spacy>=3.6.1
 tiktoken
-torch
 tqdm
-transformers>=4.40.0
 bm25s[full]
-fschat
 streamlit
 paddlepaddle
 paddlenlp
