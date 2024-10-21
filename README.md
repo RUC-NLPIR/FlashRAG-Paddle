@@ -366,7 +366,7 @@ In each category, we have implemented corresponding common pipelines. Some pipel
 
 ## :robot: Supporting Methods
 
-We have implemented 15 works with a consistent setting of:
+We have implemented 9 works with a consistent setting of:
 - **Generator:** LLAMA3-8B-instruct with input length of 2048
 - **Retriever:** e5-base-v2 as embedding model, retrieve 5 docs per query
 - **Prompt:** A consistent default prompt, template can be found in the [<u>method details</u>](./docs/baseline_details.md).
@@ -397,7 +397,7 @@ It’s important to note that, to ensure consistency, we have utilized a uniform
 
 ### Datasets
 
-We have collected and processed 35 datasets widely used in RAG research, pre-processing them to ensure a consistent format for ease of use. For certain datasets (such as Wiki-asp), we have adapted them to fit the requirements of RAG tasks according to the methods commonly used within the community. All datasets are available at [<u>Huggingface datasets</u>](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets). 
+We have collected and processed 32 datasets widely used in RAG research, pre-processing them to ensure a consistent format for ease of use. For certain datasets (such as Wiki-asp), we have adapted them to fit the requirements of RAG tasks according to the methods commonly used within the community. All datasets are available at [<u>Huggingface datasets</u>](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets). 
 
 For each dataset, we save each split as a `jsonl` file, and each line is a dict as follows:
 ```python
