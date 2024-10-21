@@ -26,7 +26,7 @@
 </p>
 
 </h4>
-FlashRAG-Paddle is a Python toolkit for Retrieval Augmented Generation (RAG) research, built on the **PaddlePaddle framework and PaddleNLP**, which is optimized for Chinese-developed chips and computing platforms.
+FlashRAG-Paddle is a Python toolkit for Retrieval Augmented Generation (RAG) research, built on the PaddlePaddle framework and PaddleNLP, which is optimized for Chinese-developed chips and computing platforms.
 
 Currently, FlashRAG-Paddle includes 32 pre-processed benchmark RAG datasets and 9 state-of-the-art RAG algorithms, all fully supported in the Paddle ecosystem. We will gradually support other algorithms in the FlashRAG repository in the future.
 
