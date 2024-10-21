@@ -70,7 +70,7 @@ pip install --upgrade paddlenlp==3.0.0b2
 Then, simply clone it from Github and install (requires Python 3.9+): 
 
 ```bash
-git clone https://github.com/corejj/FlashRAG-Paddle.git
+git clone https://github.com/RUC-NLPIR/FlashRAG-Paddle.git
 cd FlashRAG
 pip install -e . 
 ```
