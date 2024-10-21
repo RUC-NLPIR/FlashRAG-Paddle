@@ -7,7 +7,7 @@ with open("README.md", "r",encoding='utf-8') as fh:
 
 extras_require = {
     'core': requirements,
-    'retriever': ['pyserini', 'sentence-transformers>=3.0.1'],
+    'retriever': ['pyserini'],
 }
 extras_require['full'] = sum(extras_require.values(), [])
 
