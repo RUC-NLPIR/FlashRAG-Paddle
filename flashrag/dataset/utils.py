@@ -1,4 +1,20 @@
+from typing import Dict, Any, Union
+import numpy as np
 from flashrag.dataset import Dataset
+
+
+def convert_numpy(obj: Union[Dict, list, np.ndarray, np.generic]) -> Any:
+    """Recursively convert numpy objects in nested dictionaries or lists to native Python types."""
+    if isinstance(obj, dict):
+        return {k: convert_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy(i) for i in obj]
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()  # Convert numpy arrays to lists
+    elif isinstance(obj, (np.integer, np.floating)):
+        return obj.item()  # Convert numpy scalars to native Python scalars
+    else:
+        return obj  # Return the object as-is if it's neither a dict, list, nor numpy type
 
 
 def filter_dataset(dataset: Dataset, filter_func=None):

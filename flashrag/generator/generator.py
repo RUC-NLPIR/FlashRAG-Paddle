@@ -1,5 +1,6 @@
 from typing import List
 from copy import deepcopy
+import warnings
 from tqdm import tqdm
 from tqdm.auto import trange
 import numpy as np
@@ -12,6 +13,7 @@ from paddlenlp.transformers import (
     AutoConfig,
 )
 from paddlenlp.generation import GenerationConfig
+from flashrag.generator.utils import resolve_max_tokens
 
 
 class BaseGenerator:
@@ -26,6 +28,7 @@ class BaseGenerator:
         self.device = config["device"]
         self.gpu_num = paddle.device.cuda.device_count()
 
+        self.config = config
         self.generation_params = config["generation_params"]
 
     def generate(self, input_list: list) -> List[str]:
@@ -54,9 +57,7 @@ class EncoderDecoderGenerator(BaseGenerator):
 
                 self.model = FiDT5.from_pretrained(self.model_path)
             else:
-                self.model = T5ForConditionalGeneration.from_pretrained(
-                    self.model_path
-                )
+                self.model = T5ForConditionalGeneration.from_pretrained(self.model_path)
         else:
             if self.fid:
                 assert False, "FiD only support T5"
@@ -108,27 +109,14 @@ class EncoderDecoderGenerator(BaseGenerator):
             ]
             generation_params["stopping_criteria"] = stopping_criteria
 
-        max_tokens = params.pop("max_tokens", None) or params.pop(
-            "max_new_tokens", None
-        )
-        if max_tokens is not None:
-            generation_params["max_new_tokens"] = max_tokens
-        else:
-            generation_params["max_new_tokens"] = generation_params.get(
-                "max_new_tokens", generation_params.pop("max_tokens", None)
-            )
-        generation_params.pop("max_tokens", None)
+        generation_params = resolve_max_tokens(params, generation_params, prioritize_new_tokens=True)
 
         responses = []
-        for idx in trange(
-            0, len(input_list), batch_size, desc="Generation process: "
-        ):
+        for idx in trange(0, len(input_list), batch_size, desc="Generation process: "):
             batched_prompts = input_list[idx : idx + batch_size]
             if self.fid:
                 # assume each input in input_list is a list, contains K string
-                input_ids, attention_mask = self.encode_passages(
-                    batched_prompts
-                )
+                input_ids, attention_mask = self.encode_passages(batched_prompts)
                 inputs = {
                     "input_ids": input_ids.to(self.device),
                     "attention_mask": attention_mask.to(self.device),
@@ -162,11 +150,7 @@ class PDCausalLMGenerator(BaseGenerator):
     def __init__(self, config, model=None):
         super().__init__(config)
         self.config = config
-        lora_path = (
-            None
-            if "generator_lora_path" not in config
-            else config["generator_lora_path"]
-        )
+        lora_path = None if "generator_lora_path" not in config else config["generator_lora_path"]
         self.model, self.tokenizer = self._load_model(model=model)
         self.generation_config = GenerationConfig.from_pretrained(self.model_path)
         print(self.generation_config)
@@ -189,22 +173,18 @@ class PDCausalLMGenerator(BaseGenerator):
                 # trust_remote_code=True,
             )
         model.eval()
-        tokenizer = AutoTokenizer.from_pretrained(
-            self.model_path, trust_remote_code=True
-        )
+        tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
         if "qwen" not in self.model_name:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "left"
 
         return model, tokenizer
 
-    def add_new_tokens(
-        self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"
-    ):
+    def add_new_tokens(self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"):
         del self.model
         self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_path,
-                trust_remote_code=True,
+            self.model_path,
+            trust_remote_code=True,
         )
         # get original embedding weight matrix
         embedding_layer = self.model.get_input_embeddings()
@@ -266,16 +246,8 @@ class PDCausalLMGenerator(BaseGenerator):
                     stop_words=stop_sym,
                 )
             generation_params["stopping_criteria"] = stopping_criteria
-        max_tokens = params.pop("max_tokens", None) or params.pop(
-            "max_new_tokens", None
-        )
-        if max_tokens is not None:
-            generation_params["max_new_tokens"] = max_tokens
-        else:
-            generation_params["max_new_tokens"] = generation_params.get(
-                "max_new_tokens", generation_params.pop("max_tokens", None)
-            )
-        generation_params.pop("max_tokens", None)
+
+        generation_params = resolve_max_tokens(params, generation_params, prioritize_new_tokens=True)
 
         # set eos token for llama
         if "llama" in self.model_name.lower():

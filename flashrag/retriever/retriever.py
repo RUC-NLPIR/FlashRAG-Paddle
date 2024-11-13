@@ -246,6 +246,8 @@ class DenseRetriever(BaseRetriever):
 
     def __init__(self, config: dict):
         super().__init__(config)
+        if not os.path.exists(self.index_path):
+            raise Warning(f"Index file {self.index_path} does not exist!")
         self.index = faiss.read_index(self.index_path)
         if config['faiss_gpu']:
             co = faiss.GpuMultipleClonerOptions()
@@ -253,19 +255,28 @@ class DenseRetriever(BaseRetriever):
             co.shard = True
             self.index = faiss.index_cpu_to_all_gpus(self.index, co=co)
         self.corpus = load_corpus(self.corpus_path)
-        if config['use_sentence_transformer']:
-            self.encoder = STEncoder(model_name=self.retrieval_method,
-                model_path=config['retrieval_model_path'], max_length=
-                config['retrieval_query_max_length'], use_fp16=config[
-                'retrieval_use_fp16'])
+        self.topk = config["retrieval_topk"]
+        self.batch_size = config["retrieval_batch_size"]
+        self.instruction = config["instruction"]
+
+        if config["use_sentence_transformer"]:
+            self.encoder = STEncoder(
+                model_name=self.retrieval_method,
+                model_path=config["retrieval_model_path"],
+                max_length=config["retrieval_query_max_length"],
+                use_fp16=config["retrieval_use_fp16"],
+                instruction=self.instruction,
+            )
         else:
-            self.encoder = Encoder(model_name=self.retrieval_method,
-                model_path=config['retrieval_model_path'], pooling_method=
-                config['retrieval_pooling_method'], max_length=config[
-                'retrieval_query_max_length'], use_fp16=config[
-                'retrieval_use_fp16'])
-        self.topk = config['retrieval_topk']
-        self.batch_size = self.config['retrieval_batch_size']
+            self.encoder = Encoder(
+                model_name=self.retrieval_method,
+                model_path=config["retrieval_model_path"],
+                pooling_method=config["retrieval_pooling_method"],
+                max_length=config["retrieval_query_max_length"],
+                use_fp16=config["retrieval_use_fp16"],
+                instruction=self.instruction,
+            )
+        
 
     def _search(self, query: str, num: int=None, return_score=False):
         if num is None:
