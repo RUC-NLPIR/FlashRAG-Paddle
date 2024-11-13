@@ -71,7 +71,7 @@ Then, simply clone it from Github and install (requires Python 3.9+):
 
 ```bash
 git clone https://github.com/RUC-NLPIR/FlashRAG-Paddle.git
-cd FlashRAG
+cd FlashRAG-Paddle
 pip install -e . 
 ```
 
