@@ -29,8 +29,8 @@
 `vllm`, `fschat`, 또는 `pyserini` 패키지 설치 중 문제가 발생하면 `requirement.txt` 파일에서 해당 패키지를 주석 처리할 수 있습니다. 이러한 패키지는 특정 기능에 필요하지만, 일시적으로 생략해도 이 문서에서 설명하는 워크플로우에는 영향을 미치지 않습니다.
 
 ```bash
-git clone https://github.com/RUC-NLPIR/FlashRAG.git
-cd FlashRAG
+git clone https://github.com/RUC-NLPIR/FlashRAG-Paddle.git
+cd FlashRAG-Paddle
 pip install -e . 
 ```
 

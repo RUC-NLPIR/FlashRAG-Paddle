@@ -15,7 +15,7 @@ class PromptTemplate:
         self.config = config
         self.is_openai = config["framework"] == "openai"
         if not self.is_openai:
-            self.generator_path = config["generator_model_path"]
+            self.generator_path = config["generator_model"]
             model_config = AutoConfig.from_pretrained(self.generator_path, trust_remote_code=True)
             # model_name = model_config._name_or_path.lower()
             model_name = self.generator_path.lower()

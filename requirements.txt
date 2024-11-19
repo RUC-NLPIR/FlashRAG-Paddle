@@ -2,14 +2,11 @@ base58
 nltk
 numpy
 openai
-peft
 PyYAML
 rank_bm25
 rouge
-spacy>=3.6.1
+spacy==3.6.1
 tiktoken
 tqdm
 bm25s[full]
 streamlit
-paddlepaddle
-paddlenlp

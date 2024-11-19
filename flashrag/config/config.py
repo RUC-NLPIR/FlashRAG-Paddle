@@ -21,8 +21,6 @@ class Config:
         self._check_final_config()
         self._set_additional_key()
 
-        self._init_device()
-        self._set_seed()
         self._prepare_dir()
 
     def _build_yaml_loader(self):
@@ -98,17 +96,6 @@ class Config:
             split = [split]
         self.final_config["split"] = split
 
-    def _init_device(self):
-        gpu_id = self.final_config["gpu_id"]
-        if gpu_id is not None:
-            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-            import torch
-
-            self.final_config["device"] = torch.device("cuda")
-        else:
-            import torch
-
-            self.final_config["device"] = torch.device("cpu")
 
     def _set_additional_key(self):
         # set dataset
@@ -183,17 +170,9 @@ class Config:
             yaml.dump(self.final_config, f)
 
     def _set_seed(self):
-        import torch
-        import numpy as np
-
+        from paddlenlp.trainer import set_seed
         seed = self.final_config["seed"]
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.deterministic = True
+        set_seed(seed)
 
     def __setitem__(self, key, value):
         if not isinstance(key, str):
