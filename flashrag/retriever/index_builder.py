@@ -237,10 +237,7 @@ class Index_Builder:
             )
 
         def collate_fn(x):
-            if self.retrieval_method == "e5":
-                batch_data = ["passage: " + item["contents"] for item in x]
-            else:
-                batch_data = [item["contents"] for item in x]
+            batch_data = [f"{self.instruction}{item['contents']}" for item in x] 
             return self.tokenizer(
                 batch_data,
                 padding=True,
