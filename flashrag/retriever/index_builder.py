@@ -12,31 +12,29 @@ import paddle
 import paddle.distributed as dist
 import paddlenlp.datasets as datasets
 from tqdm import tqdm
-
-from flashrag.retriever.utils import (load_corpus, load_model, pooling,
-                                      set_default_instruction)
+from flashrag.retriever.utils import load_model, load_corpus, pooling, set_default_instruction
 
 
 class Index_Builder:
     """A tool class used to build an index used in retrieval."""
-
     def __init__(
-        self,
-        retrieval_method,
-        model_path,
-        corpus_path,
+        self, 
+        retrieval_method, 
+        model_path, 
+        corpus_path, 
         save_dir,
-        max_length,
-        batch_size,
-        use_fp16,
+        max_length, 
+        batch_size, 
+        use_fp16, 
         pooling_method=None,
         instruction=None,
         faiss_type=None,
-        embedding_path=None,
-        save_embedding=False,
+        embedding_path=None, 
+        save_embedding=False, 
         faiss_gpu=False,
-        use_sentence_transformer=False,
-        bm25_backend="bm25s",
+        use_sentence_transformer=False, 
+        bm25_backend='bm25s'
+
     ):
         self.retrieval_method = retrieval_method.lower()
         self.model_path = model_path
@@ -46,60 +44,49 @@ class Index_Builder:
         self.batch_size = batch_size
         self.use_fp16 = use_fp16
         self.pooling_method = pooling_method
-        self.faiss_type = faiss_type if faiss_type is not None else "Flat"
+        self.faiss_type = faiss_type if faiss_type is not None else 'Flat'
         self.instruction = instruction
         self.embedding_path = embedding_path
         self.save_embedding = save_embedding
         self.faiss_gpu = faiss_gpu
         self.use_sentence_transformer = use_sentence_transformer
         self.bm25_backend = bm25_backend
-
         self.gpu_num = paddle.distributed.get_world_size()
         # set instruction for encode
         if self.instruction is not None:
             self.instruction = self.instruction.strip() + " "
             print("Set instruction for encoding:", self.instruction)
         else:
-            self.instruction = set_default_instruction(
-                self.retrieval_method, is_query=False
-            )
+            self.instruction = set_default_instruction(self.retrieval_method, is_query=False)
             if self.instruction == "":
                 warnings.warn("Instruction is not set!")
             else:
                 warnings.warn(f"Instruction is set to default: {self.instruction}")
-
-        # . config pooling method
+        #. config pooling method
         if pooling_method is None:
             try:
                 # read pooling method from 1_Pooling/config.json
-                pooling_config = json.load(
-                    open(os.path.join(self.model_path, "1_Pooling/config.json"))
-                )
+                pooling_config = json.load(open(os.path.join(self.model_path, "1_Pooling/config.json")))
                 for k, v in pooling_config.items():
                     if k.startswith("pooling_mode") and v == True:
                         pooling_method = k.split("pooling_mode_")[-1]
-                        if pooling_method == "mean_tokens":
-                            pooling_method = "mean"
-                        elif pooling_method == "cls_token":
-                            pooling_method = "cls"
+                        if pooling_method == 'mean_tokens':
+                            pooling_method = 'mean'
+                        elif pooling_method == 'cls_token':
+                            pooling_method = 'cls'
                         else:
                             # raise warning: not implemented pooling method
-                            warnings.warn(
-                                f"Pooling method {pooling_method} is not implemented.",
-                                UserWarning,
-                            )
-                            pooling_method = "mean"
+                            warnings.warn(f"Pooling method {pooling_method} is not implemented.", UserWarning)
+                            pooling_method = 'mean'
                         break
             except:
-                print(
-                    f"Pooling method not found in {self.model_path}, use default pooling method (mean)."
-                )
+                print(f"Pooling method not found in {self.model_path}, use default pooling method (mean).")
                 # use default pooling method
-                pooling_method = "mean"
+                pooling_method = 'mean'
         else:
-            if pooling_method not in ["mean", "cls", "pooler"]:
+            if pooling_method not in ['mean', 'cls', 'pooler']:
                 raise ValueError(f"Invalid pooling method {pooling_method}.")
-        # prepare save dir
+         # prepare save dir
         print(self.save_dir)
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
@@ -212,6 +199,7 @@ class Index_Builder:
         if self.gpu_num > 1:
             print("Use multi gpu!")
             self.batch_size = self.batch_size * self.gpu_num
+
         sentence_list = [item["contents"] for item in self.corpus]
         sentence_list = [f"{self.instruction}{doc}" for doc in sentence_list]
         all_embeddings = self.encoder.encode(sentence_list, batch_size=self.batch_size)
@@ -269,7 +257,6 @@ class Index_Builder:
                 output = self.encoder(
                     **inputs, decoder_input_ids=decoder_input_ids, return_dict=True
                 )
-
                 embeddings = output.last_hidden_state[:, 0, :]
             else:
                 if "attention_mask" not in inputs:
@@ -354,27 +341,27 @@ class Index_Builder:
                 faiss_index.train(all_embeddings)
             faiss_index.add(all_embeddings)
         faiss.write_index(faiss_index, self.index_save_path)
-        print("Finish!")
+        print('Finish!')
+
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Creating index.")
-    parser.add_argument("--retrieval_method", type=str)
-    parser.add_argument("--model_path", type=str, default=None)
-    parser.add_argument("--corpus_path", type=str)
-    parser.add_argument("--save_dir", default="indexes/", type=str)
-    parser.add_argument("--max_length", type=int, default=180)
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--use_fp16", default=False, action="store_true")
-    parser.add_argument("--pooling_method", type=str, default=None)
-    parser.add_argument("--faiss_type", default=None, type=str)
-    parser.add_argument("--embedding_path", default=None, type=str)
-    parser.add_argument("--save_embedding", action="store_true", default=False)
-    parser.add_argument("--faiss_gpu", default=False, action="store_true")
-    parser.add_argument("--sentence_transformer", action="store_true", default=False)
-    parser.add_argument(
-        "--bm25_backend", default="bm25s", choices=["bm25s", "pyserini"]
-    )
+    parser = argparse.ArgumentParser(description='Creating index.')
+    parser.add_argument('--retrieval_method', type=str)
+    parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--corpus_path', type=str)
+    parser.add_argument('--save_dir', default='indexes/', type=str)
+    parser.add_argument('--max_length', type=int, default=180)
+    parser.add_argument('--batch_size', type=int, default=512)
+    parser.add_argument('--use_fp16', default=False, action='store_true')
+    parser.add_argument('--pooling_method', type=str, default=None)
+    parser.add_argument('--faiss_type', default=None, type=str)
+    parser.add_argument('--embedding_path', default=None, type=str)
+    parser.add_argument('--save_embedding', action='store_true', default=False)
+    parser.add_argument('--faiss_gpu', default=False, action='store_true')
+    parser.add_argument('--sentence_transformer', action='store_true',default=False)
+    parser.add_argument('--bm25_backend', default='bm25s', choices=['bm25s','pyserini'])
+
     args = parser.parse_args()
 
     index_builder = Index_Builder(
