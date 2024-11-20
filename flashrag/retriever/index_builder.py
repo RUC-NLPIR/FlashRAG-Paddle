@@ -317,7 +317,9 @@ class Index_Builder:
             hidden_size = self.encoder.model.get_sentence_embedding_dimension()
         else:
             self.encoder, self.tokenizer = load_model(
-                model_path=self.model_path, use_fp16=self.use_fp16
+                model_path=self.model_path,
+                use_fp16=self.use_fp16,
+                use_fast_tokenizer=self.use_fast_tokenizer,
             )
             hidden_size = self.encoder.config.hidden_size
         if self.embedding_path is not None:
