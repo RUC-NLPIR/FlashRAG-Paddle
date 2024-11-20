@@ -1,15 +1,16 @@
 import argparse
-from tqdm import tqdm
-import re
 import html
-import spacy
-import os
 import json
-import subprocess
-from pathlib import Path
+import os
+import re
 import shutil
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
+from pathlib import Path
+
+import spacy
+from tqdm import tqdm
 
 
 def load_corpus(dir_path):
@@ -162,9 +163,13 @@ def single_worker(docs):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate clean wiki corpus file for indexing.")
+    parser = argparse.ArgumentParser(
+        description="Generate clean wiki corpus file for indexing."
+    )
     parser.add_argument("--dump_path", type=str)
-    parser.add_argument("--chunk_by", default="100w", choices=["100w", "sentence"], type=str)
+    parser.add_argument(
+        "--chunk_by", default="100w", choices=["100w", "sentence"], type=str
+    )
     parser.add_argument("--seg_size", default=None, type=int)
     parser.add_argument("--stride", default=None, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
@@ -207,7 +212,9 @@ if __name__ == "__main__":
     documents = list(documents.items())
 
     with Pool(processes=args.num_workers) as p:
-        result_list = list(tqdm(p.imap(single_worker, split_list(documents, args.num_workers))))
+        result_list = list(
+            tqdm(p.imap(single_worker, split_list(documents, args.num_workers)))
+        )
     result_list = sum(result_list, [])
 
     all_title = [item[0] for item in result_list]
@@ -217,7 +224,10 @@ if __name__ == "__main__":
     idx = 0
     clean_corpus = []
     if args.chunk_by == "sentence":
-        for doc in tqdm(nlp.pipe(all_text, n_process=args.num_workers, batch_size=2000), total=len(all_text)):
+        for doc in tqdm(
+            nlp.pipe(all_text, n_process=args.num_workers, batch_size=2000),
+            total=len(all_text),
+        ):
             title = all_title[idx]
             idx += 1
             sentences = [sent.text.strip() for sent in doc.sents]
@@ -232,7 +242,10 @@ if __name__ == "__main__":
                 clean_corpus.append({"title": title, "text": text})
 
     elif args.chunk_by == "100w":
-        for doc in tqdm(nlp.pipe(all_text, n_process=args.num_workers, batch_size=2000), total=len(all_text)):
+        for doc in tqdm(
+            nlp.pipe(all_text, n_process=args.num_workers, batch_size=2000),
+            total=len(all_text),
+        ):
             title = all_title[idx]
             idx += 1
             segments = []
@@ -253,7 +266,9 @@ if __name__ == "__main__":
                         word_count += 1
                         if word_count == 100:
                             word_count = 0
-                            segments.append("".join([token for token in segment_tokens]))
+                            segments.append(
+                                "".join([token for token in segment_tokens])
+                            )
                             break
             if word_count != 0:
                 segments.append("".join([token for token in segment_tokens]))
@@ -268,6 +283,6 @@ if __name__ == "__main__":
     with open(args.save_path, "w", encoding="utf-8") as f:
         for idx, item in enumerate(clean_corpus):
             title = f"\"{item['title']}\""
-            item = {"id": idx, "title": title, "text": item["text"]}
-            f.write(json.dumps(item) + "\n")
+            item = {"id": idx, "title": title, "contents": item["text"]}
+            f.write(json.dumps(item, ensure_ascii=False) + "\n")
     print("Finish!")
