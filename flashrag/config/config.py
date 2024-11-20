@@ -118,7 +118,8 @@ class Config:
                 print("Index is empty!!")
                 assert False
 
-        self.final_config["retrieval_model_path"] = model2path.get(retrieval_method, retrieval_method)
+        if self.final_config.get("retrieval_model_path") is None:
+            self.final_config["retrieval_model_path"] = model2path.get(retrieval_method, retrieval_method)
         # TODO: not support when `retrieval_model` is path
 
         def set_pooling_method(method, model2pooling):
@@ -145,6 +146,8 @@ class Config:
             refiner_model = self.final_config["refiner_name"]
             if "refiner_model_path" not in self.final_config or self.final_config["refiner_model_path"] is None:
                 self.final_config["refiner_model_path"] = model2path.get(refiner_model, None)
+        if 'instruction' not in self.final_config:
+            self.final_config['instruction'] = None
 
         # set model path in metric setting
         metric_setting = self.final_config["metric_setting"]

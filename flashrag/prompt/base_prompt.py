@@ -1,5 +1,6 @@
 from paddlenlp.transformers import AutoTokenizer, AutoConfig
-
+import tiktoken
+import warnings
 
 class PromptTemplate:
     placeholders = ["reference", "question"]
@@ -26,6 +27,12 @@ class PromptTemplate:
         else:
             self.is_chat = True
             self.enable_chat = True
+            try:
+                self.tokenizer = tiktoken.encoding_for_model(config['generator_model'])
+            except Exception as e:
+                print("Error: ", e)
+                warnings.warn("This model is not supported by tiktoken. Use gpt-3.5-turbo instead.")
+                self.tokenizer = tiktoken.encoding_for_model('gpt-3.5-turbo')
 
         if len(system_prompt) == 0 and len(user_prompt) == 0:
             system_prompt = self.base_system_prompt
@@ -55,10 +62,7 @@ class PromptTemplate:
                 return messages
             if self.is_chat and self.enable_chat:
                 if self.is_openai:
-                    for item in input:
-                        if item["role"] == "system":
-                            item["role"] = "assistant"
-                    return messages
+                    self.truncate_prompt(messages)
                 else:
                     prompt = self.tokenizer.apply_chat_template(
                         messages, tokenize=False, add_generation_prompt=True
@@ -86,11 +90,7 @@ class PromptTemplate:
                 input.append({"role": "system", "content": system_prompt})
             if user_prompt != "":
                 input.append({"role": "user", "content": user_prompt})
-            if self.is_openai:
-                for item in input:
-                    if item["role"] == "system":
-                        item["role"] = "assistant"
-            else:
+            if not self.is_openai:
                 input = self.tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
         else:
             input = "\n\n".join([prompt for prompt in [system_prompt, user_prompt] if prompt != ""])
