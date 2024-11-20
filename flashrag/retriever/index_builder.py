@@ -261,7 +261,7 @@ class Index_Builder:
         for inputs in tqdm(self.dataloader, desc="Inference Embeddings:"):
             # print(inputs)
             if "T5" in type(self.encoder).__name__ or (
-                self.gpu_num > 1 and "T5" in type(self.encoder.module).__name__
+                self.gpu_num > 1 and "T5" in type(self.encoder._layers).__name__
             ):
                 decoder_input_ids = paddle.zeros(
                     shape=(tuple(inputs["input_ids"].shape)[0], 1), dtype="int64"
@@ -360,21 +360,26 @@ class Index_Builder:
 
 def main():
     parser = argparse.ArgumentParser(description="Creating index.")
+
+    # Basic parameters
     parser.add_argument("--retrieval_method", type=str)
     parser.add_argument("--model_path", type=str, default=None)
-    parser.add_argument("--use_fast_tokenizer", type=bool, default=True)
     parser.add_argument("--corpus_path", type=str)
     parser.add_argument("--save_dir", default="indexes/", type=str)
+
+    # Parameters for building dense index
     parser.add_argument("--max_length", type=int, default=180)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--use_fp16", default=False, action="store_true")
+    parser.add_argument("--use_fast_tokenizer", type=bool, default=True)
     parser.add_argument("--pooling_method", type=str, default=None)
+    parser.add_argument("--instruction", type=str, default=None)
     parser.add_argument("--faiss_type", default=None, type=str)
     parser.add_argument("--embedding_path", default=None, type=str)
     parser.add_argument("--save_embedding", action="store_true", default=False)
     parser.add_argument("--faiss_gpu", default=False, action="store_true")
     parser.add_argument("--sentence_transformer", action="store_true", default=False)
-    parser.add_argument("--bm25_backend", default="bm25s", choices=["bm25s", "pyserini"])
+    parser.add_argument("--bm25_backend", default='bm25s', choices=['bm25s','pyserini'])
 
     args = parser.parse_args()
 
