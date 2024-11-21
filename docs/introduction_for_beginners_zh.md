@@ -30,8 +30,8 @@ Standard RAG的流程包括以下三个步骤:
 需要注意的是，如果在```vllm```,```fschat```,```pyserini```包的安装上存在问题，可以先将```requirement.txt```中对应的包名注释掉。安装这些包只是为了某些功能的完整性，去掉之后暂时不影响本文流程的运行。
 
 ```bash
-git clone https://github.com/RUC-NLPIR/FlashRAG.git
-cd FlashRAG
+git clone https://github.com/RUC-NLPIR/FlashRAG-Paddle.git
+cd FlashRAG-Paddle
 pip install -e . 
 ```
 

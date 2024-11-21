@@ -61,9 +61,11 @@ Due to the fact that the installation of PaddlePaddle framework depends on diffe
 
 Official Installation Link: https://www.paddlepaddle.org.cn/install
 
-#### Step2: Install paddlenlp
+#### Step2: Install paddle & paddlenlp
 
 ```bash
+# other version please refer to https://www.paddlepaddle.org.cn/install
+python -m pip install paddlepaddle-gpu==3.0.0b2 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
 pip install --upgrade paddlenlp==3.0.0b2
 ```
 

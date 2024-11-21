@@ -28,8 +28,8 @@ Install the project and its dependencies using the following commands.
 Note that if you encounter issues installing the `vllm`, `fschat`, or `pyserini` packages, you can comment them out in the `requirement.txt` file. These packages are required for certain functionalities, but omitting them temporarily won't affect the workflow described in this document.
 
 ```bash
-git clone https://github.com/RUC-NLPIR/FlashRAG.git
-cd FlashRAG
+git clone https://github.com/RUC-NLPIR/FlashRAG-Paddle.git
+cd FlashRAG-Paddle
 pip install -e . 
 ```
 

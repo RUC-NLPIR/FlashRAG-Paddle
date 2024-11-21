@@ -3,23 +3,24 @@ import json
 import paddlenlp.transformers as transformers
 import paddlenlp.datasets as datasets
 
-def load_model(model_path: str, use_fp16: bool=False):
+def load_model(model_path: str, use_fp16: bool=False, use_fast_tokenizer=False):
     model_config = transformers.AutoConfig.from_pretrained(model_path,
         trust_remote_code=True)
-    model = transformers.AutoModel.from_pretrained(model_path, convert_from_torch=True)
-    model.eval()
+    
     if use_fp16:
-        model = model.astype(dtype='float16')
-    tokenizer = transformers.AutoTokenizer.from_pretrained(model_path, convert_from_torch=True)
+        model = transformers.AutoModel.from_pretrained(model_path, dtype="float16")
+    else:
+        model = transformers.AutoModel.from_pretrained(model_path)
+    model.eval()
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_path, use_fast=use_fast_tokenizer)
     return model, tokenizer
 
 
 def pooling(pooler_output, last_hidden_state, attention_mask=None, pooling_method='mean'):
     if pooling_method == 'mean':
         if attention_mask is not None:
-            attention_mask = attention_mask.astype(last_hidden_state.dtype)  # 确保类型一致
             last_hidden = last_hidden_state.masked_fill(mask=~attention_mask[..., None].astype(dtype='bool'), value=0.0)
-            return last_hidden.sum(axis=1) / attention_mask.sum(axis=1)[..., None]
+            return last_hidden.sum(axis=1) / attention_mask.sum(axis=1)[..., None].cast(last_hidden_state.dtype)
         else:
             raise ValueError("attention_mask must be provided for mean pooling.")
     elif pooling_method == 'cls':
