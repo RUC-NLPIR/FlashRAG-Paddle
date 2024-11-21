@@ -1,18 +1,17 @@
-from typing import List
 from copy import deepcopy
-import warnings
-from tqdm import tqdm
-from tqdm.auto import trange
-import numpy as np
+from typing import List
+
 import paddle
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    T5ForConditionalGeneration,
-    BartForConditionalGeneration,
-    AutoConfig,
-)
 from paddlenlp.generation import GenerationConfig
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BartForConditionalGeneration,
+    T5ForConditionalGeneration,
+)
+from tqdm.auto import trange
+
 from flashrag.generator.utils import resolve_max_tokens
 
 
@@ -32,7 +31,7 @@ class BaseGenerator:
         self.generation_params = config["generation_params"]
 
     def generate(self, input_list: list) -> List[str]:
-        """Get responses from the generater.
+        """Get responses from the generator.
 
         Args:
             input_list: it contains input texts, each item represents a sample.
@@ -61,9 +60,7 @@ class EncoderDecoderGenerator(BaseGenerator):
         else:
             if self.fid:
                 assert False, "FiD only support T5"
-            self.model = BartForConditionalGeneration.from_pretrained(
-                self.model_path
-            )
+            self.model = BartForConditionalGeneration.from_pretrained(self.model_path)
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
 
@@ -109,7 +106,9 @@ class EncoderDecoderGenerator(BaseGenerator):
             ]
             generation_params["stopping_criteria"] = stopping_criteria
 
-        generation_params = resolve_max_tokens(params, generation_params, prioritize_new_tokens=True)
+        generation_params = resolve_max_tokens(
+            params, generation_params, prioritize_new_tokens=True
+        )
 
         responses = []
         for idx in trange(0, len(input_list), batch_size, desc="Generation process: "):
@@ -150,15 +149,22 @@ class PDCausalLMGenerator(BaseGenerator):
     def __init__(self, config, model=None):
         super().__init__(config)
         self.config = config
-        lora_path = None if "generator_lora_path" not in config else config["generator_lora_path"]
+        lora_path = (
+            None
+            if "generator_lora_path" not in config
+            else config["generator_lora_path"]
+        )
         self.model, self.tokenizer = self._load_model(model=model)
         self.generation_config = GenerationConfig.from_pretrained(self.model_path)
         print(self.generation_config)
         self.use_lora = False
         if lora_path is not None:
-            from paddlenlp.peft import LoRAModel, LoRAConfig
+            from paddlenlp.peft import LoRAConfig, LoRAModel
+
             config = LoRAConfig.from_pretrained(lora_path)
-            self.model = LoRAModel.from_pretrained(self.model, lora_path,lora_config=config)
+            self.model = LoRAModel.from_pretrained(
+                self.model, lora_path, lora_config=config
+            )
             self.use_lora = True
             self.model.mark_only_lora_as_trainable()
 
@@ -173,14 +179,18 @@ class PDCausalLMGenerator(BaseGenerator):
                 # trust_remote_code=True,
             )
         model.eval()
-        tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.model_path, trust_remote_code=True
+        )
         if "qwen" not in self.model_name:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "left"
 
         return model, tokenizer
 
-    def add_new_tokens(self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"):
+    def add_new_tokens(
+        self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"
+    ):
         del self.model
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
@@ -190,7 +200,7 @@ class PDCausalLMGenerator(BaseGenerator):
         embedding_layer = self.model.get_input_embeddings()
         embedding_weights = embedding_layer.weight
         original_vocab_size, embedding_dim = embedding_weights.shape
-    
+
         new_tokens_weights = paddle.load(token_embedding_path)
         new_tokens_length = new_tokens_weights.shape[0]
 
@@ -200,7 +210,7 @@ class PDCausalLMGenerator(BaseGenerator):
 
         # create new embedding matrix
         new_vocab_size = original_vocab_size + new_tokens_length
-        new_embedding_weights = paddle.zeros(shape=[new_vocab_size,embedding_dim])
+        new_embedding_weights = paddle.zeros(shape=[new_vocab_size, embedding_dim])
 
         # copy original embeddings to the new weights
         new_embedding_weights[:original_vocab_size, :] = embedding_weights
@@ -241,13 +251,15 @@ class PDCausalLMGenerator(BaseGenerator):
 
             stop_sym = generation_params.pop("stop")
             stopping_criteria = StopWordCriteria(
-                    tokenizer=self.tokenizer,
-                    prompts=input_list,
-                    stop_words=stop_sym,
-                )
+                tokenizer=self.tokenizer,
+                prompts=input_list,
+                stop_words=stop_sym,
+            )
             generation_params["stopping_criteria"] = stopping_criteria
 
-        generation_params = resolve_max_tokens(params, generation_params, prioritize_new_tokens=True)
+        generation_params = resolve_max_tokens(
+            params, generation_params, prioritize_new_tokens=True
+        )
 
         # set eos token for llama
         if "llama" in self.model_name.lower():
@@ -282,7 +294,6 @@ class PDCausalLMGenerator(BaseGenerator):
                 **generation_params,
             )
             for i, generated_sequence in enumerate(outputs[0]):
-                input_ids = inputs["input_ids"][i]
                 text = self.tokenizer.decode(
                     generated_sequence,
                     skip_special_tokens=True,
@@ -329,7 +340,7 @@ class PDCausalLMGenerator(BaseGenerator):
             outputs = self.model(context_tensor)
             logits = outputs.logits
             logits = logits[0, len(input_ids) - 1 : len(context_ids) - 1, :]
-            logits = logits.to('float32').detach().cpu()
+            logits = logits.to("float32").detach().cpu()
             # softmax to normalize
             probs = paddle.nn.functional.softmax(x=logits, axis=-1)
             # obtain probs of target_ids
