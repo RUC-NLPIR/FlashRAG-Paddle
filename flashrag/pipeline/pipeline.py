@@ -1,3 +1,4 @@
+import paddle
 from flashrag.evaluator import Evaluator
 from flashrag.dataset.utils import split_dataset, merge_dataset
 from flashrag.utils import get_retriever, get_generator, get_refiner, get_judger
@@ -122,9 +123,10 @@ class SequentialPipeline(BasicPipeline):
         if self.refiner:
             del self.refiner
         pred_answer_list = self.generator.generate(input_prompts)
-        dataset.update_output("pred", pred_answer_list)
-        
-        dataset = self.evaluate(dataset, do_eval=do_eval, pred_process_fun=pred_process_fun)
+
+        if paddle.distributed.get_rank() == 0:
+            dataset.update_output("pred", pred_answer_list)
+            dataset = self.evaluate(dataset, do_eval=do_eval, pred_process_fun=pred_process_fun)
 
         return dataset
 

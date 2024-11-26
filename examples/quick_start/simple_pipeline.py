@@ -4,8 +4,6 @@ from flashrag.utils import get_dataset
 from flashrag.pipeline import SequentialPipeline
 from flashrag.prompt import PromptTemplate
 import paddle
-paddle.device.set_device("gpu:0")
-paddle.disable_static()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str)
@@ -22,13 +20,19 @@ config_dict = {
     "metrics": ["em", "f1", "acc"],
     "retrieval_topk": 1,
     "save_intermediate_data": True,
+    "dtype": "float16", # generator_model_dtype
+    "inference_model": True,
+    # "quant_type": "weight_only_int8",
+    # "quant_type": "weight_only_int4",
+    # "block_attn": True,
+    # "append_attn": True,
 }
 
 config = Config(config_dict=config_dict)
 
 all_split = get_dataset(config)
 test_data = all_split["test"]
-prompt_templete = PromptTemplate(
+prompt_template = PromptTemplate(
     config,
     system_prompt="Answer the question based on the given document. \
                     Only give me the answer and do not output any other words. \
@@ -37,9 +41,10 @@ prompt_templete = PromptTemplate(
 )
 
 
-pipeline = SequentialPipeline(config, prompt_template=prompt_templete)
+pipeline = SequentialPipeline(config, prompt_template=prompt_template)
 
 
 output_dataset = pipeline.run(test_data, do_eval=True)
 print("---generation output---")
-print(output_dataset.pred)
+if paddle.distributed.get_rank() == 0:
+    print(output_dataset.pred)

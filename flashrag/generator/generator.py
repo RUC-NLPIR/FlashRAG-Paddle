@@ -366,6 +366,7 @@ class PaddleParallelCausalLMGenerator(BaseGenerator):
         predictor_args, model_args = parser.parse_dict(config.final_config)
 
         predictor_args.model_name_or_path = config["model2path"][config.generator_model]
+        predictor_args.batch_size = config["generator_batch_size"]
 
         paddle.set_device(predictor_args.device)
         paddle.set_default_dtype(predictor_args.dtype)
@@ -382,6 +383,9 @@ class PaddleParallelCausalLMGenerator(BaseGenerator):
             fleet.init(is_collective=True, strategy=strategy)
 
         self.predictor = create_predictor(predictor_args, model_args)
+        self.model_path = predictor_args.model_name_or_path
+        if "Chat" not in predictor_args.model_name_or_path and "Instruct" not in predictor_args.model_name_or_path:
+            self.predictor.tokenizer.chat_template = None
 
     def add_new_tokens(
         self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"
@@ -441,9 +445,7 @@ class PaddleParallelCausalLMGenerator(BaseGenerator):
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = self.predictor.predict(batch_source_text)
 
-            if self.predictor.tensor_parallel_rank > 0:
-                continue
-            for output in outputs:
-                responses.append(output)
-
+            if paddle.distributed.get_rank() == 0:
+                for output in outputs:
+                    responses.append(output)
         return responses
