@@ -2,12 +2,6 @@ from copy import deepcopy
 from typing import List
 
 import paddle
-from llm.predict.predictor import (
-    ModelArgument,
-    PredictorArgument,
-    batchfy_text,
-    create_predictor,
-)
 from paddle.distributed import fleet
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import PdArgumentParser
@@ -22,6 +16,15 @@ from tqdm.auto import trange
 
 from flashrag.generator.utils import resolve_max_tokens
 
+try:
+    from llm.predict.predictor import (
+        ModelArgument,
+        PredictorArgument,
+        batchfy_text,
+        create_predictor,
+    )
+except ImportError:
+    print("Please clone and add PaddleNLP to your PYTHONPATH, e.g., `export PYTHONPATH=$PYTHONPATH:/home/your_name/PaddleNLP")
 
 class BaseGenerator:
     """`BaseGenerator` is a base object of Generator model."""
