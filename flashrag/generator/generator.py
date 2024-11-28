@@ -1,20 +1,30 @@
-from typing import List
 from copy import deepcopy
-import warnings
-from tqdm import tqdm
-from tqdm.auto import trange
-import numpy as np
+from typing import List
+
 import paddle
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    T5ForConditionalGeneration,
-    BartForConditionalGeneration,
-    AutoConfig,
-)
+from paddle.distributed import fleet
 from paddlenlp.generation import GenerationConfig
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BartForConditionalGeneration,
+    T5ForConditionalGeneration,
+)
+from tqdm.auto import trange
+
 from flashrag.generator.utils import resolve_max_tokens
 
+try:
+    from llm.predict.predictor import (
+        ModelArgument,
+        PredictorArgument,
+        batchfy_text,
+        create_predictor,
+    )
+except ImportError:
+    print("Please clone and add PaddleNLP to your PYTHONPATH, e.g., `export PYTHONPATH=$PYTHONPATH:/home/your_name/PaddleNLP")
 
 class BaseGenerator:
     """`BaseGenerator` is a base object of Generator model."""
@@ -336,3 +346,97 @@ class PDCausalLMGenerator(BaseGenerator):
             target_probs = probs[range(len(target_ids)), target_ids].numpy()
 
         return logits, target_probs
+
+
+class PaddleParallelCausalLMGenerator(BaseGenerator):
+    """Class for decoder-only generator."""
+
+    def __init__(self, config, model=None):
+        super().__init__(config)
+        parser = PdArgumentParser((PredictorArgument, ModelArgument))
+        predictor_args, model_args = parser.parse_dict(config.final_config)
+
+        predictor_args.model_name_or_path = config["model2path"][config.generator_model]
+        predictor_args.batch_size = config["generator_batch_size"]
+
+        paddle.set_device(predictor_args.device)
+        paddle.set_default_dtype(predictor_args.dtype)
+
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        if tensor_parallel_degree > 1:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+
+        self.predictor = create_predictor(predictor_args, model_args)
+        self.model_path = predictor_args.model_name_or_path
+        if "Chat" not in predictor_args.model_name_or_path and "Instruct" not in predictor_args.model_name_or_path:
+            self.predictor.tokenizer.chat_template = None
+
+    def add_new_tokens(
+        self, token_embedding_path, token_name_func=lambda idx: f"[ref{idx+1}]"
+    ):
+        del self.predictor.model
+        self.predictor.model = AutoModelForCausalLM.from_pretrained(
+            self.model_path,
+            trust_remote_code=True,
+        )
+        # get original embedding weight matrix
+        embedding_layer = self.predictor.model.get_input_embeddings()
+        embedding_weights = embedding_layer.weight
+        original_vocab_size, embedding_dim = embedding_weights.shape
+
+        new_tokens_weights = paddle.load(token_embedding_path)
+        new_tokens_length = new_tokens_weights.shape[0]
+
+        # expand vocabulary
+        new_tokens = [token_name_func(idx) for idx in range(new_tokens_length)]
+        self.predictor.tokenizer.add_tokens(new_tokens)
+
+        # create new embedding matrix
+        new_vocab_size = original_vocab_size + new_tokens_length
+        new_embedding_weights = paddle.zeros(shape=[new_vocab_size, embedding_dim])
+
+        # copy original embeddings to the new weights
+        new_embedding_weights[:original_vocab_size, :] = embedding_weights
+
+        # append virtual token embeddings to the new weights
+        for token, embedding in zip(new_tokens, new_tokens_weights):
+            token_id = self.predictor.tokenizer.convert_tokens_to_ids(token)
+            new_embedding_weights[token_id] = embedding
+
+        # update the embedding table
+        # note: we should avoid using the function resize_token_embeddings() because this function will also change the lm_head of the model
+        embedding_layer.weight.set_value(new_embedding_weights)
+        self.predictor.model.eval()
+
+    @paddle.no_grad()
+    def generate(
+        self,
+        input_list: List[str],
+        batch_size=None,
+        return_scores=False,
+        return_dict=False,
+        **params,
+    ):
+        """Generate batches one by one. The generated content needs to exclude input."""
+        if isinstance(input_list, str):
+            input_list = [input_list]
+        if batch_size is None:
+            batch_size = self.batch_size
+
+        batch_source_texts = batchfy_text(input_list, batch_size)
+
+        responses = []
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            outputs = self.predictor.predict(batch_source_text)
+
+            if paddle.distributed.get_rank() == 0:
+                for output in outputs:
+                    responses.append(output)
+        return responses

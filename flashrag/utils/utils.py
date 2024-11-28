@@ -35,7 +35,7 @@ def get_generator(config, **params):
         if "t5" in arch.lower() or "bart" in arch.lower():
             return getattr(importlib.import_module("flashrag.generator"), "EncoderDecoderGenerator")(config, **params)
         else:
-            return getattr(importlib.import_module("flashrag.generator"), "PDCausalLMGenerator")(config, **params)
+            return getattr(importlib.import_module("flashrag.generator"), "PaddleParallelCausalLMGenerator")(config, **params)
     elif config["framework"] == "openai":
         return getattr(importlib.import_module("flashrag.generator"), "OpenaiGenerator")(config, **params)
     else:
