@@ -37,7 +37,7 @@ def get_generator(config, **params):
         else:
             try:
                 return getattr(importlib.import_module("flashrag.generator"), "PaddleParallelCausalLMGenerator")(config, **params)
-            except ImportError:
+            except Exception:
                 return getattr(importlib.import_module("flashrag.generator"), "PDCausalLMGenerator")(config, **params)
     elif config["framework"] == "openai":
         return getattr(importlib.import_module("flashrag.generator"), "OpenaiGenerator")(config, **params)
