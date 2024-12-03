@@ -181,6 +181,7 @@ class PDCausalLMGenerator(BaseGenerator):
                 # torch_dtype="auto",
                 # device_map="auto",
                 # trust_remote_code=True,
+                dtype=paddle.get_default_dtype(),
             )
         model.eval()
         tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
